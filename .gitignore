@@ -1,0 +1,20 @@
+# 가상환경
+.venv/
+__pycache__/
+*.pyc
+
+# 비밀값 / 실제 설정
+.env
+config/config.yaml
+
+# 런타임 데이터 / 로그
+data/
+logs/
+*.db
+*.sqlite
+*.sqlite3
+
+# OS / 에디터
+.DS_Store
+.vscode/
+*.swp

@@ -1,0 +1,49 @@
+# 스마트팜 장비 구성 템플릿
+# 이 파일을 config.yaml 로 복사한 뒤 실제 구성에 맞게 수정하세요.
+#   cp config/config.example.yaml config/config.yaml
+
+# 측정 주기 (초)
+sampling_interval_sec: 30
+
+# 제어 판단 주기 (초)
+control_interval_sec: 60
+
+# ── 센서 정의 ──────────────────────────────────────────────
+# type: temperature | humidity | ph | ec
+# interface: onewire | i2c
+sensors:
+  - { name: temp_1, type: temperature, interface: onewire, address: "28-xxxxxxxx" }
+  - { name: temp_2, type: temperature, interface: i2c,     address: 0x44 }
+  - { name: humi_1, type: humidity,    interface: i2c,     address: 0x44 }
+  - { name: ph_1,   type: ph,          interface: i2c,     address: 0x48, channel: 0,
+      calibration: { ph4: 3.05, ph7: 2.54 } }
+  - { name: ec_1,   type: ec,          interface: i2c,     address: 0x49, channel: 0,
+      calibration: { k: 1.0, temp_coef: 0.02 } }
+
+# ── 밸브 정의 ──────────────────────────────────────────────
+# pin: BCM(GPIO) 번호 / active_high: true면 HIGH=ON, false면 LOW=ON(active-low 릴레이)
+valves:
+  - { name: valve_1, pin: 17, active_high: false, role: "nutrient_supply" }
+  - { name: valve_2, pin: 27, active_high: false, role: "drain" }
+  - { name: valve_3, pin: 22, active_high: false, role: "irrigation_a" }
+  - { name: valve_4, pin: 23, active_high: false, role: "irrigation_b" }
+
+# ── 임계값 / 자동제어 규칙 (예시) ───────────────────────────
+rules:
+  ph:
+    min: 5.5
+    max: 6.5
+  ec:
+    min: 1.2   # mS/cm
+    max: 2.5
+  temperature:
+    max: 30.0  # 초과 시 경보
+  humidity:
+    min: 40.0
+    max: 80.0
+
+# ── 알림 설정 ──────────────────────────────────────────────
+alerts:
+  send_startup_message: true   # 서버 시작 시 텔레그램 알림
+  on_threshold_breach: true    # 임계값 이탈 시 알림
+  heartbeat_hours: 12          # 주기적 생존 보고 (0이면 끔)

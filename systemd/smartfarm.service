@@ -1,0 +1,16 @@
+[Unit]
+Description=Smart Farm Server (sensors, valves, telegram)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bsa
+WorkingDirectory=/home/bsa/smartfarm
+Environment=PYTHONPATH=/home/bsa/smartfarm/src
+ExecStart=/home/bsa/smartfarm/.venv/bin/python -m smartfarm.main
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

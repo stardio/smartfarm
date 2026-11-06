@@ -1,0 +1,14 @@
+# 핵심 의존성 (필요에 따라 센서별 라이브러리 추가)
+PyYAML>=6.0
+python-dotenv>=1.0
+requests>=2.31          # 텔레그램 HTTP API 호출용
+
+# GPIO / I2C (라즈베리파이) — 설치 환경에서 활성화
+gpiozero>=2.0
+lgpio>=0.2              # Pi 3/4/5 GPIO 백엔드
+smbus2>=0.4            # I2C 통신
+
+# 센서별(예시) — 실제 사용 센서에 맞게 주석 해제/추가
+# adafruit-circuitpython-ads1x15   # pH/EC ADC(ADS1115)
+# adafruit-circuitpython-sht31d    # SHT31 온습도
+# w1thermsensor                    # DS18B20 온도
