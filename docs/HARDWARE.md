@@ -9,11 +9,29 @@
 
 ## 센서 목록
 
-### 온도 센서
-| 이름 | 종류 | 연결 방식 | 주소/핀 | 비고 |
+### 온도 센서 — DS18B20 x3 (1-Wire)
+3개 모두 **GPIO4(물리 7번)** 1-Wire 버스를 공유한다. 각 센서는 고유 주소로 구분.
+
+| 이름 | 종류 | 버스핀(BCM) | 주소(ROM) | 비고 |
 |---|---|---|---|---|
-| temp_1 | DS18B20 | 1-Wire | GPIO4 (w1) | 방수형 |
-| temp_2 | (예: SHT31) | I2C | 0x44 | 온습도 겸용 |
+| temp_1 | DS18B20 | GPIO4 | 28-xxxxxxxxxxxx | 설치 후 실제 주소 입력 |
+| temp_2 | DS18B20 | GPIO4 | 28-xxxxxxxxxxxx | |
+| temp_3 | DS18B20 | GPIO4 | 28-xxxxxxxxxxxx | |
+
+**배선 (3개 공통/병렬):**
+- VDD  → 3.3V (물리 1번)
+- GND  → GND  (물리 6/9/14/20/25/30/34/39번 중 하나)
+- DATA → GPIO4 (물리 7번)
+- **풀업 저항 4.7kΩ 1개**: DATA(GPIO4) ↔ 3.3V 사이 (버스 전체에 1개만)
+
+**활성화 & 주소 확인:**
+```bash
+sudo raspi-config nonint do_onewire 0   # 1-Wire(GPIO4) 켜기
+sudo reboot
+bash scripts/detect_ds18b20.sh          # 연결된 28-... 주소 목록 출력
+```
+확인한 주소를 config.yaml 의 temp_1/2/3 address 에 입력 후:
+`systemctl --user restart smartfarm`
 
 ### 습도 센서
 | 이름 | 종류 | 연결 방식 | 주소/핀 | 비고 |

@@ -4,20 +4,29 @@
 
 # 측정 주기 (초)
 sampling_interval_sec: 30
-
 # 제어 판단 주기 (초)
 control_interval_sec: 60
+
+# ── 1-Wire 버스 (DS18B20 온도센서 공용) ─────────────────────
+# DS18B20 은 모두 GPIO4(물리 7번) 한 선을 공유하고 주소로 구분.
+# 활성화: sudo raspi-config nonint do_onewire 0 && sudo reboot
+# 주소확인: ls /sys/bus/w1/devices/   (28-... 를 아래 address 에 입력)
+onewire:
+  gpio: 4            # 1-Wire 데이터 핀 (BCM). 변경 시 config.txt 의 dtoverlay 도 수정 필요
 
 # ── 센서 정의 ──────────────────────────────────────────────
 # type: temperature | humidity | ph | ec
 # interface: onewire | i2c
 sensors:
-  - { name: temp_1, type: temperature, interface: onewire, address: "28-xxxxxxxx" }
-  - { name: temp_2, type: temperature, interface: i2c,     address: 0x44 }
-  - { name: humi_1, type: humidity,    interface: i2c,     address: 0x44 }
-  - { name: ph_1,   type: ph,          interface: i2c,     address: 0x48, channel: 0,
+  # 온도 DS18B20 3개 — 모두 GPIO4 버스 공유, address 는 설치 후 실제 ROM 코드로 교체
+  - { name: temp_1, type: temperature, interface: onewire, address: "28-000000000001" }
+  - { name: temp_2, type: temperature, interface: onewire, address: "28-000000000002" }
+  - { name: temp_3, type: temperature, interface: onewire, address: "28-000000000003" }
+  # 습도/ pH / EC (예시 — 실제 센서에 맞게 수정)
+  - { name: humi_1, type: humidity, interface: i2c, address: 0x44 }
+  - { name: ph_1,   type: ph,  interface: i2c, address: 0x48, channel: 0,
       calibration: { ph4: 3.05, ph7: 2.54 } }
-  - { name: ec_1,   type: ec,          interface: i2c,     address: 0x49, channel: 0,
+  - { name: ec_1,   type: ec,  interface: i2c, address: 0x49, channel: 0,
       calibration: { k: 1.0, temp_coef: 0.02 } }
 
 # ── 밸브 정의 ──────────────────────────────────────────────
@@ -30,20 +39,13 @@ valves:
 
 # ── 임계값 / 자동제어 규칙 (예시) ───────────────────────────
 rules:
-  ph:
-    min: 5.5
-    max: 6.5
-  ec:
-    min: 1.2   # mS/cm
-    max: 2.5
-  temperature:
-    max: 30.0  # 초과 시 경보
-  humidity:
-    min: 40.0
-    max: 80.0
+  ph: { min: 5.5, max: 6.5 }
+  ec: { min: 1.2, max: 2.5 }          # mS/cm
+  temperature: { max: 30.0 }          # 초과 시 경보
+  humidity: { min: 40.0, max: 80.0 }
 
 # ── 알림 설정 ──────────────────────────────────────────────
 alerts:
-  send_startup_message: true   # 서버 시작 시 텔레그램 알림
-  on_threshold_breach: true    # 임계값 이탈 시 알림
-  heartbeat_hours: 12          # 주기적 생존 보고 (0이면 끔)
+  send_startup_message: true
+  on_threshold_breach: true
+  heartbeat_hours: 12
