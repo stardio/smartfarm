@@ -127,7 +127,10 @@ class ControlStore:
 
     def finish_command(self, cid: int, status: str, result: str = "") -> None:
         self._run(lambda c: c.execute("UPDATE commands SET status=?, result=?, done_ts=? WHERE id=?",
-                                      (status, result[:200], time.time(), cid)))
+                                      (status, result[:4000], time.time(), cid)))
+
+    def mark_command(self, cid: int, status: str) -> None:
+        self._run(lambda c: c.execute("UPDATE commands SET status=? WHERE id=?", (status, cid)))
 
     def command_result(self, cid: int) -> dict | None:
         row = self._run(lambda c: c.execute("SELECT status, result FROM commands WHERE id=?", (cid,)).fetchone())

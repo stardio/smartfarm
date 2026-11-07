@@ -57,17 +57,21 @@ class Channel:
         self.reason = ""
         self.end_result = "completed"
         self.sensor = None          # {"name", "value", "ok"}
+        self.out_error = ""         # 출력(통신) 실패 메시지
 
 
 class Controller:
     def __init__(self, cfg: dict, store: ControlStore | None = None, notify=None,
-                 clock=time.time, status_path: Path = CONTROL_STATUS):
+                 clock=time.time, status_path: Path = CONTROL_STATUS, iom=None):
         self.ccfg = cfg.get("control") or {}
+        self.iom = iom                       # fieldio.IOManager (없으면 모든 출력 mock)
         irr = self.ccfg.get("irrigation") or {}
         self.max_concurrent = max(1, int(irr.get("max_concurrent", 1)))
         self.use_pump = bool(irr.get("pump", True))
         self.hardware = self.ccfg.get("hardware", "mock")
         self.store = store or ControlStore()
+        if iom is not None:
+            iom.command_store = self.store
         self.notify = notify or (lambda text: None)
         self.clock = clock
         self.status_path = Path(status_path)
@@ -77,8 +81,8 @@ class Controller:
         for sid in ORDER:
             for z in range(1, SYSTEMS[sid]["zones"] + 1):
                 key = f"{sid}.{z}"
-                self.channels[(sid, z)] = Channel(sid, z, build_output(key, self.ccfg))
-        self.pump = Channel("irrigation", 0, build_output("irrigation.pump", self.ccfg)) if self.use_pump else None
+                self.channels[(sid, z)] = Channel(sid, z, build_output(key, self.ccfg, iom))
+        self.pump = Channel("irrigation", 0, build_output("irrigation.pump", self.ccfg, iom)) if self.use_pump else None
 
         self.readings: dict[str, tuple] = {}      # 이름 → (값, 모의값 여부, 종류, 시각)
         self.paused = False
@@ -171,9 +175,14 @@ class Controller:
             return
         try:
             ch.output.set(desired)
-        except Exception:  # noqa: BLE001
-            log.exception("출력 실패: %s.%s", ch.system, ch.zone)
+        except Exception as e:  # noqa: BLE001
+            if not ch.out_error:                      # 실패가 이어지는 동안 로그는 처음 1회만
+                log.error("출력 실패: %s.%s → %s (%s)", ch.system, ch.zone, "ON" if desired else "OFF", e)
+            ch.out_error = str(e)[:120]
             return
+        if ch.out_error:
+            log.info("출력 복구: %s.%s", ch.system, ch.zone)
+            ch.out_error = ""
         ch.on, ch.since = desired, now
         if ch.zone == 0:            # 관수 주 펌프: 기록하지 않음
             return
@@ -187,6 +196,17 @@ class Controller:
     # ── 명령 ───────────────────────────────────────────────
     def _process_commands(self, now):
         for cid, _ts, cmd in self.store.pending_commands(now):
+            if str(cmd.get("action", "")).startswith("io_"):
+                # 시운전 명령: 릴레이 시험은 전체 정지 상태에서만. 처리는 I/O 작업 스레드가 한다.
+                if self.iom is None:
+                    self.store.finish_command(cid, "error", json.dumps({"message": "I/O 관리자 없음"}))
+                elif cmd["action"] == "io_pulse" and not self.paused:
+                    self.store.finish_command(cid, "error", json.dumps(
+                        {"message": "릴레이 시험은 '전체 정지' 상태에서만 할 수 있습니다"}, ensure_ascii=False))
+                else:
+                    self.store.mark_command(cid, "running")
+                    self.iom.submit(cid, cmd)
+                continue
             try:
                 msg = self.execute(cmd, now)
                 self.store.finish_command(cid, "done", msg)
@@ -561,6 +581,10 @@ class Controller:
                 }
                 if ch.sensor:
                     item["sensor"] = ch.sensor
+                if self.iom is not None:
+                    item["io"] = self.iom.channel_info(f"{sid}.{z}")
+                if ch.out_error:
+                    item["out_error"] = ch.out_error
                 if sid == "irrigation":
                     if z in self.active:
                         item["end"] = self.active[z]["end"]
@@ -578,7 +602,10 @@ class Controller:
                 entry["auto"] = bool(self.nutrient_cfg.get("auto"))
                 entry["phase"] = dict(self.nut_phase)
             systems.append(entry)
-        return {"updated_at": now, "paused": self.paused, "hardware": self.hardware, "systems": systems}
+        hardware = self.hardware
+        if self.iom is not None:
+            hardware = "modbus" if self.iom.has_real_outputs() else ("modbus-sim" if self.iom.map else "mock")
+        return {"updated_at": now, "paused": self.paused, "hardware": hardware, "systems": systems}
 
     def _write_status(self, now):
         sig = (self.paused, tuple(ch.on for ch in self._all_channels()),

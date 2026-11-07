@@ -4,6 +4,7 @@ python-dotenv>=1.0
 requests>=2.31          # 텔레그램 HTTP API 호출용
 smbus2>=0.4             # I2C 통신 (순수 파이썬)
 gpiozero>=2.0           # 밸브(GPIO) 제어 상위 API
+pyserial>=3.5          # Modbus RTU (USB-RS485). Modbus TCP 는 표준 라이브러리만 사용
 
 # ── GPIO 백엔드 (라즈베리파이에서 apt 로 설치 권장) ──────────
 # lgpio 는 Python 3.13 용 wheel 이 없어 pip 빌드 시 swig 필요.

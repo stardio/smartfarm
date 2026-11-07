@@ -173,3 +173,16 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 #nut-form { margin-top: 12px; }
 .card.ov.static { cursor: default; }
 .card.ov.static:hover { border-color: var(--line); }
+
+/* ── I/O 화면 ─────────────────────────────────────── */
+.zio { font-size: .78rem; }
+.err, .zio.err { color: var(--bad); }
+.guide { margin-top: 20px; }
+.guide summary { cursor: pointer; }
+.guide ol { margin: 8px 0; padding-left: 20px; font-size: .9rem; }
+.relay-card { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+.relay-card select { max-width: 100%; }
+#scan-result .card { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+#sensor-devs { margin-bottom: 12px; }
+#read-form { margin-top: 12px; }
+.btn:disabled.ghost { opacity: .4; }

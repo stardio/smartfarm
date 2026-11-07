@@ -13,7 +13,7 @@
   <div class="wrap top-inner">
     <div>
       <h1>스마트팜 제어</h1>
-      <p class="sub"><a href="/">공개 현황</a> · <a href="/admin">관리자 정보</a></p>
+      <p class="sub"><a href="/">공개 현황</a> · <a href="/admin">관리자 정보</a> · <a href="/io">I/O 할당·시운전</a></p>
     </div>
     <div class="top-actions">
       <span class="state" id="ctl-state" data-state="unknown"><span class="dot"></span><span id="ctl-state-text">확인 중…</span></span>
@@ -34,7 +34,8 @@
 
   <div id="ctl-view" hidden>
     <p class="notice" id="mock-notice" hidden>
-      <strong>시뮬레이션 모드</strong> — 실제 릴레이가 아직 연결되지 않아 켜기/끄기는 화면과 기록에만 반영됩니다.
+      <strong>시뮬레이션 모드</strong> — 실제 릴레이가 할당되지 않은 출력은 화면과 기록에만 반영됩니다
+      (각 카드의 "출력" 줄 참고, 할당은 <a href="/io">I/O 할당</a>).
       스케줄·설정·리포트는 실제와 똑같이 동작하므로 미리 설정해 둘 수 있습니다.
     </p>
     <p class="notice bad" id="paused-notice" hidden>

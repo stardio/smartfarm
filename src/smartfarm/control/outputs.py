@@ -59,7 +59,33 @@ class GpioOutput(Output):
             self.state = False
 
 
-def build_output(key: str, control_cfg: dict) -> Output:
+class MappedOutput(Output):
+    """I/O 할당(화면에서 지정)을 따르는 출력. 할당이 없으면 시뮬레이션처럼 상태만 기억."""
+
+    def __init__(self, key: str, iom):
+        super().__init__(key)
+        self.iom = iom
+
+    @property
+    def driver(self):  # noqa: D401
+        info = self.iom.channel_info(self.key)
+        return "mock" if info is None else ("modbus-sim" if info["sim"] else "modbus")
+
+    def set(self, on: bool) -> None:
+        self.iom.set_channel(self.key, on)       # 실패하면 RuntimeError → 상태 바꾸지 않음
+        self.state = bool(on)
+
+    def close(self) -> None:
+        try:
+            self.iom.set_channel(self.key, False)
+        except RuntimeError:
+            pass
+        self.state = False
+
+
+def build_output(key: str, control_cfg: dict, iom=None) -> Output:
+    if iom is not None:
+        return MappedOutput(key, iom)
     spec = ((control_cfg or {}).get("channels") or {}).get(key) or {}
     driver = spec.get("driver") or (control_cfg or {}).get("hardware", "mock")
     if driver == "mock":

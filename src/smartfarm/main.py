@@ -19,6 +19,7 @@ from .status import write_status
 from .alerts import AlertManager
 from .notify import commands
 from .control.engine import Controller
+from .fieldio.manager import IOManager
 
 log = get_logger(__name__)
 _running = True
@@ -54,12 +55,22 @@ def main() -> None:
         heartbeat_text=lambda: commands.cmd_temp() + "\n\n" + commands.cmd_alerts())
     failing: set[str] = set()       # 읽기 실패 중인 센서 (로그 반복 방지)
     # 구역 제어기(관수·양액·조명·공조팬·히터): 1초 주기 별도 스레드
-    controller = Controller(cfg, notify=notifier.send)
+    # 필드 I/O(Modbus): 출력 할당·센서 할당은 웹 I/O 화면(/io)에서 지정
+    iom = IOManager(notify=notifier.send)
+    iom.start()
+    base_sensors = list(sensors)
+    io_sensor_version = iom.sensor_version
+    sensors = base_sensors + iom.sensors()
+    controller = Controller(cfg, notify=notifier.send, iom=iom)
     controller.start()
 
     try:
         while _running:
             started = time.monotonic()
+            if iom.sensor_version != io_sensor_version:      # 화면에서 센서 할당이 바뀜
+                io_sensor_version = iom.sensor_version
+                sensors = base_sensors + iom.sensors()
+                log.info("Modbus 센서 목록 갱신: %s", [s.name for s in sensors if s.interface == "modbus"])
             # 측정 소요시간 때문에 생기는 오차를 흡수(반 주기 여유)
             save_now = last_save is None or started - last_save >= save_interval - interval / 2
             readings = {}
@@ -96,6 +107,7 @@ def main() -> None:
             time.sleep(max(0.0, interval - (time.monotonic() - started)))
     finally:
         controller.stop()
+        iom.stop()
         for v in valves:
             v.close_safe()
         db.close()

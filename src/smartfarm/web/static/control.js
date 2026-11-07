@@ -141,6 +141,7 @@
       card.appendChild(el("div", "zmode muted"));
       card.appendChild(el("div", "zreason"));
       card.appendChild(el("div", "zsched muted", schedText(sid, c)));
+      card.appendChild(el("div", "zio muted"));
       var ctl = el("div", "zctl");
       var inp = el("input", "mins");
       inp.type = "number"; inp.min = "1";
@@ -186,7 +187,18 @@
       if (sid === "irrigation" && z.next && !z.on) mode += " · 다음 " + mdhm(z.next);
       card.querySelector(".zmode").textContent = mode;
       card.querySelector(".zreason").textContent = z.reason || "";
+      ioLine(card, z);
     });
+  }
+
+  function ioLine(card, z) {
+    var x = card.querySelector(".zio");
+    if (!x) return;
+    var txt = z.io ? "출력: " + z.io.label + (z.io.sim ? " (시뮬레이터)" : "") : "출력: 미할당 (시뮬레이션)";
+    if (z.io && !z.io.online) txt += " · ⚠ 통신 끊김";
+    if (z.out_error) txt += " · ⚠ " + z.out_error;
+    x.textContent = txt;
+    x.classList.toggle("err", !!(z.out_error || (z.io && !z.io.online)));
   }
 
   // ── 양액 ───────────────────────────────────────────────
@@ -202,6 +214,7 @@
       head.appendChild(el("span", "pill zpill", "—"));
       card.appendChild(head);
       card.appendChild(el("div", "zreason"));
+      card.appendChild(el("div", "zio muted"));
       var ctl = el("div", "zctl");
       var inp = el("input", "mins");
       inp.type = "number"; inp.min = "1"; inp.max = "120";
@@ -255,6 +268,7 @@
       p.textContent = z.on ? "작동 중" : "꺼짐";
       p.className = "pill zpill" + (z.on ? " open" : "");
       card.querySelector(".zreason").textContent = z.reason || "";
+      ioLine(card, z);
     });
     api("GET", "/api/public/status").then(function (r) {
       var g = $("nut-now");
@@ -481,7 +495,7 @@
     $("ctl-state-text").textContent = !okState ? "제어기 응답 없음" : (s.paused ? "전체 정지 중" : "자동 운전 중");
     $("pause-btn").hidden = !okState || s.paused;
     $("resume-btn").hidden = !okState || !s.paused;
-    $("mock-notice").hidden = st.hardware_real;
+    $("mock-notice").hidden = s.hardware === "modbus";
     $("paused-notice").hidden = !s.paused;
     $("stale-notice").hidden = okState;
     $("denied-notice").hidden = st.control_allowed;

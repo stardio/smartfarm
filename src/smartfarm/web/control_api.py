@@ -55,6 +55,13 @@ class ControlAPI:
         return out
 
     def hardware_real(self) -> bool:
+        """실제 출력이 가능한 상태인지 (PIN 제어 차단 판단). Modbus 실장비 또는 config 의 gpio 등."""
+        from ..fieldio.store import IOStore
+        try:
+            if IOStore(self.db_path).has_real_devices():
+                return True
+        except Exception:  # noqa: BLE001
+            return True                     # 판단 불가 시 안전한 쪽(강한 인증 요구)
         c = self._cfg().get("control") or {}
         if c.get("hardware", "mock") != "mock":
             return True

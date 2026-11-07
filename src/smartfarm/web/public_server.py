@@ -32,6 +32,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from . import admin as admin_mod
 from .control_api import REPORT_DAYS, ControlAPI
+from .io_api import IOAPI
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB = ROOT / "data" / "smartfarm.db"
@@ -41,9 +42,10 @@ DEFAULT_LOG = ROOT / "logs" / "smartfarm.log"
 DEFAULT_ENV = ROOT / ".env"
 DEFAULT_CONTROL_DB = ROOT / "data" / "control.db"
 DEFAULT_CONTROL_STATUS = ROOT / "data" / "control.json"
+DEFAULT_IO_STATUS = ROOT / "data" / "io.json"
 MAX_BODY = 2048
 MAX_CONTROL_BODY = 16384
-CONTROL_POSTS = ("/admin/api/control/command", "/admin/api/control/config")
+CONTROL_POSTS = ("/admin/api/control/command", "/admin/api/control/config", "/admin/api/io")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 SENSOR_TYPES = ("temperature", "humidity", "ph", "ec")
@@ -63,6 +65,8 @@ STATIC_FILES = {
     "/admin.js": ("admin.js", "text/javascript; charset=utf-8"),
     "/control": ("control.html", "text/html; charset=utf-8"),
     "/control.js": ("control.js", "text/javascript; charset=utf-8"),
+    "/io": ("io.html", "text/html; charset=utf-8"),
+    "/io.js": ("io.js", "text/javascript; charset=utf-8"),
 }
 
 SECURITY_HEADERS = {
@@ -213,6 +217,7 @@ class Handler(BaseHTTPRequestHandler):
     auth: admin_mod.AdminAuth
     paths: dict
     control: ControlAPI
+    io: IOAPI
 
     # 접근 로그는 남기지 않는다(공개 서버, journal 용량 절약)
     def log_message(self, format, *args):  # noqa: A002
@@ -322,6 +327,23 @@ class Handler(BaseHTTPRequestHandler):
             data["status"] = self.data.status()
             return self._json(data)
 
+        if path.startswith("/admin/api/io/"):
+            if not self._is_admin():
+                return self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "login_required"})
+            if path == "/admin/api/io/state":
+                data = self.io.state()
+                st = self.control.status()
+                real = self.control.hardware_real()
+                data.update(paused=bool(st.get("paused")), control_state=st.get("state"), real=real,
+                            control_allowed=not (real and self.auth.kind == "pin"))
+                return self._json(data)
+            if path == "/admin/api/io/command":
+                try:
+                    cid = int(parse_qs(url.query).get("id", ["0"])[0])
+                except ValueError:
+                    cid = 0
+                return self._json(self.io.command_result(cid))
+
         if path.startswith("/admin/api/control/"):
             if not self._is_admin():
                 return self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "login_required"})
@@ -413,6 +435,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(HTTPStatus.BAD_REQUEST, {"error": "bad_json"})
         if path == "/admin/api/control/command":
             status, obj = self.control.command(body)
+        elif path == "/admin/api/io":
+            status, obj = self.io.post(body)
         else:
             status, obj = self.control.save_config(body)
         return self._send_json(status, obj)
@@ -430,12 +454,15 @@ def make_server(host: str, port: int, db_path: Path, status_path: Path,
                 admin_hash: str | None = None, config_path: Path = DEFAULT_CONFIG,
                 log_path: Path = DEFAULT_LOG, admin_kind: str = "password",
                 control_db: Path = DEFAULT_CONTROL_DB,
-                control_status: Path = DEFAULT_CONTROL_STATUS) -> ThreadingHTTPServer:
+                control_status: Path = DEFAULT_CONTROL_STATUS,
+                io_status: Path = DEFAULT_IO_STATUS) -> ThreadingHTTPServer:
+    control = ControlAPI(control_db, control_status, config_path)
     handler = type("BoundHandler", (Handler,), {
         "data": DataSource(db_path, status_path),
         "auth": admin_mod.AdminAuth(admin_hash, admin_kind),
         "paths": {"root": ROOT, "db": Path(db_path), "config": Path(config_path), "log": Path(log_path)},
-        "control": ControlAPI(control_db, control_status, config_path),
+        "control": control,
+        "io": IOAPI(control_db, io_status, config_path, lambda: control.store),
     })
     httpd = ThreadingHTTPServer((host, port), handler)
     httpd.daemon_threads = True

@@ -44,7 +44,7 @@
    토큰·chat id 만 입력하면 동작 → `ssh -t smartfarm "cd ~/smartfarm && PYTHONPATH=src .venv/bin/python -m smartfarm.notify.setup_bot"`
    (docs/TELEGRAM.md)
 4. **습도/pH/EC 드라이버 실제 구현** (`src/smartfarm/sensors/humidity.py, ph.py, ec.py`의 TODO)
-5. **구역 제어**: 관수·양액·조명·공조팬·히터 제어기·웹 제어 화면(/control)·리포트 완료(2026-11-07, 시뮬레이션 모드). 하드웨어: RS485 Modbus 릴레이 보드 여러 개로 결정, 배선 후 I/O 할당 예정. 남은 것: Modbus 드라이버·I/O 할당 → docs/CONTROL.md
+5. **구역 제어**: 관수·양액·조명·공조팬·히터 제어기·웹 제어 화면(/control)·리포트 완료(2026-11-07, 시뮬레이션 모드). 하드웨어: RS485 Modbus 릴레이 보드 여러 개로 결정, 배선 후 I/O 할당 예정. Modbus 드라이버·I/O 할당 화면(/io) 완료 → docs/IO.md. 남은 것: 배선 후 실제 보드 등록·할당 → docs/CONTROL.md
 6. (참고) RTK Base 폴더 `~/raspberrypi_RTK_base/` 에 재활용 가능한 DS18B20 다중센서 코드 있음.
 
 ## 새 PC 최초 셋업
