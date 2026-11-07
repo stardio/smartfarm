@@ -41,19 +41,29 @@ def main() -> None:
         notifier.send("🌱 스마트팜 서버 시작됨")
 
     log.info("센서 %d개, 밸브 %d개 로드 완료", len(sensors), len(valves))
+    # 측정 주기(웹 표시·판단)와 DB 저장 주기를 분리한다.
     interval = cfg.get("sampling_interval_sec", 30)
+    save_interval = cfg.get("db_save_interval_sec", interval)
+    log.info("측정 주기 %s초, DB 저장 주기 %s초", interval, save_interval)
+    last_save = None
 
     try:
         while _running:
+            started = time.monotonic()
+            # 측정 소요시간 때문에 생기는 오차를 흡수(반 주기 여유)
+            save_now = last_save is None or started - last_save >= save_interval - interval / 2
             readings = {}
             for s in sensors:
                 try:
                     value = s.read()
                     readings[s.name] = value
-                    db.save_reading(s.name, s.type, value)
+                    if save_now:
+                        db.save_reading(s.name, s.type, value)
                     log.debug("%s(%s) = %s", s.name, s.type, value)
                 except Exception:  # noqa: BLE001
                     log.exception("센서 읽기 실패: %s", s.name)
+            if save_now:
+                last_save = started
 
             # TODO: cfg["rules"] 기반 임계값 판단 → valve 제어 → 이탈 시 notifier.send(...)
             evaluate_rules(cfg, readings, valves, notifier)
@@ -62,7 +72,8 @@ def main() -> None:
             except Exception:  # noqa: BLE001
                 log.exception("상태 파일 기록 실패")
 
-            time.sleep(interval)
+            # 측정에 걸린 시간을 빼고 대기해 주기를 일정하게 유지
+            time.sleep(max(0.0, interval - (time.monotonic() - started)))
     finally:
         for v in valves:
             v.close_safe()

@@ -2,8 +2,10 @@
 # 이 파일을 config.yaml 로 복사한 뒤 실제 구성에 맞게 수정하세요.
 #   cp config/config.example.yaml config/config.yaml
 
-# 측정 주기 (초)
-sampling_interval_sec: 30
+# 측정 주기 (초) — 센서 읽기·웹 표시(status.json)·자동제어 판단 주기
+sampling_interval_sec: 10
+# DB 저장 주기 (초) — 측정값을 이 간격으로만 SQLite 에 기록 (생략 시 측정 주기와 동일)
+db_save_interval_sec: 30
 # 제어 판단 주기 (초)
 control_interval_sec: 60
 
