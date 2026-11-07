@@ -2,6 +2,8 @@
 
 Raspberry Pi 3 Model B+ 에서 동작하는 스마트팜 제어 서버입니다.
 
+> 제품 비전·로드맵: [docs/PLATFORM.md](docs/PLATFORM.md) — 관수·양액·환경제어·AGV 통합 농업 자동화 플랫폼
+
 ## 기능
 - **센싱**: 온도 / 습도 / pH / EC 센서 (각각 여러 개) 주기적 측정
 - **제어**: 여러 개의 밸브(valve) 개폐 제어
