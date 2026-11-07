@@ -128,13 +128,33 @@
   function startTimer() { stopTimer(); timer = setInterval(loadOverview, REFRESH_MS); }
   function stopTimer() { if (timer) clearInterval(timer); timer = null; }
 
+  var pinMode = false;
+  function setPinMode(on) {
+    pinMode = !!on;
+    var i = $("password");
+    $("pw-label").textContent = pinMode ? "PIN (숫자 4자리)" : "비밀번호";
+    i.classList.toggle("pin", pinMode);
+    if (pinMode) {
+      i.setAttribute("inputmode", "numeric");
+      i.setAttribute("maxlength", "4");
+      i.setAttribute("pattern", "[0-9]{4}");
+      i.setAttribute("autocomplete", "off");
+    } else {
+      i.removeAttribute("inputmode");
+      i.removeAttribute("maxlength");
+      i.removeAttribute("pattern");
+      i.setAttribute("autocomplete", "current-password");
+    }
+  }
+
   function init() {
     return api("GET", "/admin/api/session").then(function (r) {
       var s = r.body || {};
       if (!s.configured) return show("setup-view");
+      setPinMode(s.pin);
       if (!s.logged_in) {
         show("login-view");
-        if (s.locked_sec) setMsg("로그인 시도가 너무 많아 잠겼습니다. " + Math.ceil(s.locked_sec / 60) + "분 후 다시 시도하세요.");
+        if (s.locked_sec) setMsg("로그인 시도가 너무 많아 잠겼습니다. " + waitText(s.locked_sec) + " 후 다시 시도하세요.");
         $("password").focus();
         return;
       }
@@ -145,19 +165,31 @@
   }
 
   function setMsg(t) { $("login-msg").textContent = t || ""; }
+  function waitText(sec) {
+    var m = Math.ceil(sec / 60);
+    return m >= 60 ? Math.floor(m / 60) + "시간 " + (m % 60 ? (m % 60) + "분" : "") : m + "분";
+  }
+
+  $("password").addEventListener("input", function () {
+    if (!pinMode) return;
+    var v = this.value.replace(/[^0-9]/g, "").slice(0, 4);
+    if (v !== this.value) this.value = v;
+    if (v.length === 4 && !$("login-btn").disabled) $("login-form").requestSubmit();
+  });
 
   $("login-form").addEventListener("submit", function (e) {
     e.preventDefault();
     var pw = $("password").value;
     if (!pw) return;
+    if (pinMode && !/^[0-9]{4}$/.test(pw)) return setMsg("숫자 4자리를 입력하세요.");
     $("login-btn").disabled = true;
     setMsg("확인 중…");
     api("POST", "/admin/api/login", { password: pw }).then(function (r) {
       $("login-btn").disabled = false;
       $("password").value = "";
       if (r.status === 200) { setMsg(""); return init(); }
-      if (r.status === 429) return setMsg("로그인 시도가 너무 많아 잠겼습니다. " + Math.ceil((r.body.locked_sec || 900) / 60) + "분 후 다시 시도하세요.");
-      if (r.status === 401) return setMsg("비밀번호가 올바르지 않습니다.");
+      if (r.status === 429) return setMsg("로그인 시도가 너무 많아 잠겼습니다. " + waitText(r.body.locked_sec || 900) + " 후 다시 시도하세요.");
+      if (r.status === 401) { $("password").focus(); return setMsg(pinMode ? "PIN 이 올바르지 않습니다." : "비밀번호가 올바르지 않습니다."); }
       if (r.status === 503) return init();
       setMsg("로그인 실패 (" + r.status + ")");
     }).catch(function () {

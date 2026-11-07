@@ -25,7 +25,7 @@
     <form class="login card" id="login-form" autocomplete="on">
       <h2>관리자 로그인</h2>
       <input type="text" name="username" value="admin" autocomplete="username" hidden>
-      <label for="password">비밀번호</label>
+      <label for="password" id="pw-label">비밀번호</label>
       <input id="password" name="password" type="password" autocomplete="current-password" required>
       <button type="submit" class="btn" id="login-btn">로그인</button>
       <p class="msg" id="login-msg" role="alert"></p>
@@ -39,6 +39,7 @@
       <pre class="code">cd ~/smartfarm
 PYTHONPATH=src .venv/bin/python -m smartfarm.web.admin_password
 systemctl --user restart smartfarm-web</pre>
+      <p class="muted">숫자 4자리 PIN 또는 10자 이상 비밀번호로 정할 수 있습니다.</p>
     </div>
   </section>
 

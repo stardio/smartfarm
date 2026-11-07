@@ -119,3 +119,4 @@ th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--lin
 th { color: var(--muted); font-weight: 600; }
 tbody tr:last-child td { border-bottom: 0; }
 [hidden] { display: none !important; }
+.login input.pin { font-size: 1.8rem; letter-spacing: .6em; text-align: center; padding-left: .6em; font-variant-numeric: tabular-nums; }

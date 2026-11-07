@@ -3,8 +3,11 @@
 - 비밀번호는 평문으로 저장하지 않는다. `.env` 의 ADMIN_PASSWORD_HASH 에
   scrypt 해시만 둔다(설정: python -m smartfarm.web.admin_password).
 - 세션은 서버 메모리에만 있다(웹서버 재시작 시 모두 로그아웃).
-- 로그인 실패가 반복되면 일정 시간 전체 로그인을 잠근다. Funnel 뒤에서는
-  클라이언트 IP 를 신뢰할 수 없으므로 IP 별이 아니라 전역으로 제한한다.
+- 비밀번호 형식: 숫자 4자리 PIN 또는 10자 이상 비밀번호.
+- 로그인 실패가 반복되면 전체 로그인을 잠그고, 잠길 때마다 잠금 시간을 2배로 늘린다
+  (15분 → 30분 → … 최대 24시간). PIN 은 경우의 수가 1만 개뿐이라 이 단계적 잠금이
+  무차별 대입을 사실상 막는 핵심 장치다. Funnel 뒤에서는 클라이언트 IP 를 신뢰할 수
+  없으므로 IP 별이 아니라 전역으로 제한한다.
 """
 from __future__ import annotations
 
@@ -25,6 +28,16 @@ from pathlib import Path
 # ── 비밀번호 해시 ──────────────────────────────────────────
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 14, 8, 1
 MIN_PASSWORD_LEN = 10
+PIN_RE = re.compile(r"[0-9]{4}")
+
+
+def secret_kind(password: str) -> str | None:
+    """허용 형식이면 'pin' 또는 'password', 아니면 None."""
+    if PIN_RE.fullmatch(password):
+        return "pin"
+    if len(password) >= MIN_PASSWORD_LEN:
+        return "password"
+    return None
 
 
 def hash_password(password: str) -> str:
@@ -54,15 +67,20 @@ class AdminAuth:
     ABSOLUTE_SEC = 12 * 3600     # 로그인 후 최대 12시간
     MAX_SESSIONS = 20
     FAIL_WINDOW_SEC = 15 * 60
-    FAIL_LIMIT = 10              # 15분 안에 10번 틀리면
-    LOCK_SEC = 15 * 60           # 15분 잠금
+    FAIL_LIMIT = 5               # 15분 안에 5번 틀리면 잠금
+    LOCK_SEC = 15 * 60           # 첫 잠금 15분, 이후 잠길 때마다 2배
+    LOCK_MAX_SEC = 24 * 3600     # 최대 24시간
+    LEVEL_RESET_SEC = 24 * 3600  # 24시간 동안 실패가 없으면 잠금 단계 초기화
     FAIL_DELAY_SEC = 1.0         # 실패 응답 지연(무차별 대입 속도 저하)
 
-    def __init__(self, password_hash: str | None):
+    def __init__(self, password_hash: str | None, kind: str = "password"):
         self.password_hash = password_hash or None
+        self.kind = "pin" if kind == "pin" else "password"
         self._sessions: dict[str, tuple[float, float]] = {}   # token → (created, last_seen)
         self._fails: deque[float] = deque()
         self._locked_until = 0.0
+        self._lock_level = 0
+        self._last_fail = 0.0
         self._lock = threading.Lock()
 
     @property
@@ -87,14 +105,20 @@ class AdminAuth:
                     del self._sessions[oldest]
                 self._sessions[token] = (now, now)
                 self._fails.clear()
+                self._lock_level = 0
             return token
         now = time.monotonic()
         with self._lock:
+            if self._last_fail and now - self._last_fail > self.LEVEL_RESET_SEC:
+                self._lock_level = 0
+            self._last_fail = now
             self._fails.append(now)
             while self._fails and now - self._fails[0] > self.FAIL_WINDOW_SEC:
                 self._fails.popleft()
             if len(self._fails) >= self.FAIL_LIMIT:
-                self._locked_until = now + self.LOCK_SEC
+                dur = min(self.LOCK_SEC * (2 ** self._lock_level), self.LOCK_MAX_SEC)
+                self._locked_until = now + dur
+                self._lock_level += 1
                 self._fails.clear()
         time.sleep(self.FAIL_DELAY_SEC)
         return None

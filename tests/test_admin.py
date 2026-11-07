@@ -195,5 +195,65 @@ class PasswordHashTest(unittest.TestCase):
             self.assertEqual(env.stat().st_mode & 0o777, 0o600)
 
 
+
+class PinTest(unittest.TestCase):
+    def test_secret_kind(self):
+        self.assertEqual(admin.secret_kind("4827"), "pin")
+        self.assertEqual(admin.secret_kind("a-long-password"), "password")
+        for bad in ("123", "12345", "12a4", "short", "", "４８２７"):   # 전각 숫자도 거부
+            self.assertIsNone(admin.secret_kind(bad), bad)
+
+    def test_pin_login_and_session_flag(self):
+        with tempfile.TemporaryDirectory() as d:
+            httpd = _server(Path(d), admin.hash_password("4827"))
+            httpd.RequestHandlerClass.auth.kind = "pin"
+            try:
+                port = httpd.server_address[1]
+                c = http.client.HTTPConnection(HOST, port, timeout=5)
+                c.request("GET", "/admin/api/session")
+                self.assertTrue(json.loads(c.getresponse().read())["pin"])
+                c.close()
+                c = http.client.HTTPConnection(HOST, port, timeout=5)
+                c.request("POST", "/admin/api/login", body=b'{"password":"4827"}',
+                          headers={"Origin": f"http://{HOST}:{port}", "Content-Type": "application/json"})
+                r = c.getresponse()
+                self.assertEqual(r.status, 200)
+                self.assertIn("__Host-sf_admin=", r.getheader("Set-Cookie"))
+                c.close()
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+
+    def test_lock_duration_escalates_and_caps(self):
+        auth = admin.AdminAuth(admin.hash_password("4827"), "pin")
+        auth.FAIL_DELAY_SEC = 0
+        durations = []
+        for _ in range(9):
+            for _ in range(auth.FAIL_LIMIT):
+                auth.login("0000")
+            durations.append(auth.locked_for())
+            auth._locked_until = 0          # 잠금 시간 경과를 흉내
+        base = auth.LOCK_SEC
+        self.assertAlmostEqual(durations[0], base, delta=2)
+        self.assertAlmostEqual(durations[1], base * 2, delta=2)
+        self.assertAlmostEqual(durations[2], base * 4, delta=2)
+        self.assertAlmostEqual(durations[-1], auth.LOCK_MAX_SEC, delta=2)
+        # 성공하면 단계 초기화
+        self.assertIsNotNone(auth.login("4827"))
+        for _ in range(auth.FAIL_LIMIT):
+            auth.login("0000")
+        self.assertAlmostEqual(auth.locked_for(), base, delta=2)
+
+    def test_write_hash_stores_kind(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = Path(d) / ".env"
+            write_hash(env, "scrypt:a", "pin")
+            write_hash(env, "scrypt:b", "pin")
+            text = env.read_text(encoding="utf-8")
+            self.assertEqual(text.count("ADMIN_PASSWORD_HASH="), 1)
+            self.assertIn("ADMIN_PASSWORD_HASH=scrypt:b", text)
+            self.assertIn("ADMIN_PASSWORD_KIND=pin", text)
+
+
 if __name__ == "__main__":
     unittest.main()

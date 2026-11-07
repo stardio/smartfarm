@@ -297,6 +297,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/admin/api/session":
             return self._json({"configured": self.auth.configured,
+                               "pin": self.auth.kind == "pin",
                                "logged_in": self._is_admin(),
                                "locked_sec": self.auth.locked_for()})
 
@@ -363,10 +364,10 @@ class Handler(BaseHTTPRequestHandler):
 
 def make_server(host: str, port: int, db_path: Path, status_path: Path,
                 admin_hash: str | None = None, config_path: Path = DEFAULT_CONFIG,
-                log_path: Path = DEFAULT_LOG) -> ThreadingHTTPServer:
+                log_path: Path = DEFAULT_LOG, admin_kind: str = "password") -> ThreadingHTTPServer:
     handler = type("BoundHandler", (Handler,), {
         "data": DataSource(db_path, status_path),
-        "auth": admin_mod.AdminAuth(admin_hash),
+        "auth": admin_mod.AdminAuth(admin_hash, admin_kind),
         "paths": {"root": ROOT, "db": Path(db_path), "config": Path(config_path), "log": Path(log_path)},
     })
     httpd = ThreadingHTTPServer((host, port), handler)
@@ -392,7 +393,9 @@ def main() -> None:
         print("ADMIN_PASSWORD_HASH 미설정 → 관리자 로그인 비활성 "
               "(python -m smartfarm.web.admin_password 로 설정)", flush=True)
 
-    httpd = make_server(args.host, args.port, args.db, args.status, admin_hash=admin_hash)
+    admin_kind = os.environ.get("ADMIN_PASSWORD_KIND", "password")
+    httpd = make_server(args.host, args.port, args.db, args.status,
+                        admin_hash=admin_hash, admin_kind=admin_kind)
     print(f"smartfarm-web listening on http://{args.host}:{args.port}", flush=True)
     try:
         httpd.serve_forever()

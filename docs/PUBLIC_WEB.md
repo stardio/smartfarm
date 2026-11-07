@@ -52,11 +52,14 @@ CPU 온도·가동시간·부하·메모리·디스크, DB 건수·기간, 센�
 
 ```bash
 cd ~/smartfarm
-PYTHONPATH=src .venv/bin/python -m smartfarm.web.admin_password   # 10자 이상, 화면에 표시 안 됨
+PYTHONPATH=src .venv/bin/python -m smartfarm.web.admin_password   # 숫자 4자리 PIN 또는 10자 이상, 화면에 표시 안 됨
 systemctl --user restart smartfarm-web
 ```
 
-- `.env` 의 `ADMIN_PASSWORD_HASH` 에 **scrypt 해시만** 저장(평문 저장 안 함, `.env` 는 git 제외, 권한 600).
+- 형식: **숫자 4자리 PIN**(같은 숫자 반복·1234 등 연속 숫자는 거부) 또는 **10자 이상 비밀번호**.
+  PIN 이면 로그인 화면에 숫자 키패드가 뜨고 4자리 입력 시 자동 로그인.
+- `.env` 의 `ADMIN_PASSWORD_HASH` 에 **scrypt 해시만** 저장, 형식은 `ADMIN_PASSWORD_KIND`(pin/password)
+  (평문 저장 안 함, `.env` 는 git 제외, 권한 600).
 - 해시가 없으면 관리자 로그인은 비활성(503)이고 화면에 설정 방법이 표시된다.
 - 웹서버 재시작 시 모든 로그인 세션이 끊긴다(세션은 메모리에만 보관).
 
@@ -64,7 +67,10 @@ systemctl --user restart smartfarm-web
 
 - 세션 쿠키 `__Host-sf_admin`: HttpOnly · Secure · SameSite=Strict · Path=/. 2시간 미사용 또는 로그인 12시간 후 만료.
 - 로그인/로그아웃 POST 는 `Origin` 이 접속 호스트와 같을 때만 처리(CSRF 방지), 본문 2KB 제한.
-- 실패 시 1초 지연, **15분 안에 10회 실패하면 15분간 로그인 전체 잠금**(올바른 비밀번호도 거부).
+- 실패 시 1초 지연, **15분 안에 5회 실패하면 로그인 전체 잠금**(올바른 비밀번호도 거부).
+  잠금 시간은 잠길 때마다 2배: 15분 → 30분 → 1시간 → … **최대 24시간**. 로그인에 성공하거나
+  24시간 동안 실패가 없으면 초기화. PIN 은 경우의 수가 1만 개뿐이라 이 단계적 잠금이 핵심 방어다
+  (잠금 상한 도달 후에는 하루 5회만 시도 가능 → 전체 대입에 수년).
   Funnel 뒤에서는 접속자 IP 를 신뢰할 수 없어 IP 별이 아닌 전역 제한이다.
   → 누군가 일부러 계속 틀리면 관리자도 잠시 로그인할 수 없다. 그때는 SSH 로 접속하거나
   `systemctl --user restart smartfarm-web` 으로 잠금을 풀 수 있다.
@@ -106,7 +112,7 @@ systemctl --user disable --now smartfarm-web     # 웹서버까지 중단
 PYTHONPATH=src .venv/bin/python -B -m unittest -v tests.test_public_server tests.test_admin
 ```
 
-관리자 11개 테스트: 로그인 화면, 미로그인 401, 오답, 로그인→상세→로그아웃(쿠키 속성·로그 가림 포함),
+관리자 15개 테스트(PIN 형식·단계적 잠금 포함): 로그인 화면, 미로그인 401, 오답, 로그인→상세→로그아웃(쿠키 속성·로그 가림 포함),
 위조 쿠키, 타 사이트 Origin 403, 본문 크기 413, 반복 실패 잠금, 미설정 503, 해시 검증, `.env` 갱신.
 
 공개 9개 테스트: 화면·정적파일 제공, 공개 필드 허용 목록(핀·주소·토큰 미노출),
