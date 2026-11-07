@@ -65,8 +65,41 @@ systemctl --user restart smartfarm-bot       # .env 수동 수정 후
 PYTHONPATH=src .venv/bin/python -B -m unittest -v tests.test_bot     # 17개, 네트워크 없음
 ```
 
-## 아직 없는 것
+## 자동 경보 (요청하지 않아도 전송)
 
-- 기준 이탈 시 **자동 경보 전송**: `main.py` 의 `evaluate_rules()` 구현 시 `notifier.send()` 로 추가 예정
-  (`/alerts` 는 요청할 때만 현재 경고를 보여준다).
+측정 서버(`smartfarm`)가 10초마다 판단해 등록된 대화로 보낸다. 코드: `src/smartfarm/alerts.py`.
+
+| 알림 | 조건 |
+|---|---|
+| 🔴 [경보] | 기준(`rules`)을 **연속 3회(30초)** 벗어남 — 한 번 튀는 값은 무시 |
+| 🔴 [경보 지속] | 이탈이 계속되면 **60분마다** 다시 알림 |
+| ✅ [복구] | 기준 안쪽으로 여유값만큼(온도 0.5 °C) 들어온 상태가 연속 3회 — 기준선 근처에서 경보/복구가 반복되지 않음 |
+| ⚠ [센서 오류] | 센서 값을 연속 3회 못 읽음 (선 빠짐, CRC 오류, 85 °C 리셋값 등) |
+| ✅ [센서 복구] | 다시 정상 측정 |
+| 🕒 정기 보고 | **12시간마다** 온도와 경고 요약 |
+| 🌱 서버 시작됨 | 측정 서버가 시작될 때 (Pi 재부팅 포함) |
+
+예: `🔴 [경보] temp_1 온도 31.2 °C — 최대 30.0 °C 초과`
+
+- 아직 드라이버가 없는 **모의값 센서(습도/pH/EC)는 경보에서 제외**한다(`include_simulated: false`).
+  실제 센서를 연결하면 자동으로 포함된다.
+- 인터넷이 끊겨 있으면 전송을 약 9분 동안 재시도한다. 측정은 전송을 기다리지 않는다.
+- 기준값은 `config/config.yaml` 의 `rules`, 경보 설정은 `alerts` 에서 바꾼 뒤 `systemctl --user restart smartfarm`.
+
+```yaml
+alerts:
+  on_threshold_breach: true      # 자동 경보 켜기/끄기
+  confirm_count: 3               # 연속 몇 회 이탈 시 경보
+  remind_minutes: 60             # 재알림 간격 (0 = 끔)
+  include_simulated: false
+  hysteresis: { temperature: 0.5, humidity: 2.0, ph: 0.1, ec: 0.1 }
+  heartbeat_hours: 12            # 정기 보고 (0 = 끔)
+```
+
+- 이 Pi 자체가 꺼지거나 인터넷이 끊기면 알림을 보낼 수 없다. 정기 보고가 오지 않으면 Pi 상태를 확인한다.
+
+## 참고
+
+- 온도센서 주소가 설정된 센서는 선이 빠져도 모의값으로 바뀌지 않고 "값 없음"이 된다(센서 오류 경보).
 - `/temp` 의 24시간 최저/최고에는 2026-11-07 14:30 이전 모의 데이터가 섞여 있다(24시간 지나면 자연히 빠짐).
+- 밸브 자동 제어는 아직 없다(`main.py` 의 `evaluate_rules()`).

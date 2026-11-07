@@ -9,7 +9,9 @@
   ls /sys/bus/w1/devices/                  # 28-... 주소 확인 → config.yaml 에 입력
 
 커널이 각 센서를 /sys/bus/w1/devices/<주소>/w1_slave 로 노출한다.
-주소가 비었거나 장치가 없으면(미연결) 모의값을 반환해 서버가 멈추지 않게 한다.
+주소가 비어 있으면(아직 미설치) 모의값을 반환한다. 주소가 설정된 센서가 사라지면
+(선 빠짐·고장) 모의값으로 바꾸지 않고 오류를 내서 센서 오류 경보가 나가게 한다.
+85.000 °C(전원 리셋 직후 기본값)와 측정 범위(-55~125 °C) 밖 값도 오류로 처리한다.
 """
 from __future__ import annotations
 
@@ -32,15 +34,19 @@ class TemperatureSensor(Sensor):
         self.address = spec.get("address") or ""
         self._warned = False
 
-    def _device_file(self) -> Path | None:
-        if not self.address or not str(self.address).startswith("28-"):
-            return None
-        f = W1_DIR / str(self.address) / "w1_slave"
-        return f if f.exists() else None
+    def _configured(self) -> bool:
+        return bool(self.address) and str(self.address).startswith("28-")
 
     def read(self) -> float:
-        f = self._device_file()
-        if f is None:
+        if self._configured():
+            self.simulated = False
+            f = W1_DIR / str(self.address) / "w1_slave"
+            try:
+                text = f.read_text()
+            except OSError:
+                raise RuntimeError(f"DS18B20 {self.name}({self.address}) 응답 없음 — 배선 확인") from None
+            return self._parse(text)
+        else:
             self.simulated = True
             if not self._warned:
                 log.warning(
@@ -50,7 +56,7 @@ class TemperatureSensor(Sensor):
                 self._warned = True
             return round(random.uniform(18.0, 28.0), 2)
 
-        text = f.read_text()
+    def _parse(self, text: str) -> float:
         lines = text.splitlines()
         # 1행 끝에 CRC 상태(YES/NO), 2행에 "t=밀리섭씨"
         if not lines or not lines[0].strip().endswith("YES"):
@@ -58,5 +64,7 @@ class TemperatureSensor(Sensor):
         idx = text.find("t=")
         if idx < 0:
             raise RuntimeError(f"DS18B20 {self.name} 온도값 파싱 실패")
-        self.simulated = False
-        return round(int(text[idx + 2:]) / 1000.0, 3)
+        milli = int(text[idx + 2:].split()[0])
+        if milli == 85000 or not -55000 <= milli <= 125000:
+            raise RuntimeError(f"DS18B20 {self.name} 비정상 값 {milli / 1000:.3f} °C")
+        return round(milli / 1000.0, 3)

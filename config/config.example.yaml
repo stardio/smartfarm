@@ -47,7 +47,16 @@ rules:
   humidity: { min: 40.0, max: 80.0 }
 
 # ── 알림 설정 ──────────────────────────────────────────────
+# 자동 경보 (텔레그램) — 자세한 동작은 docs/TELEGRAM.md
 alerts:
   send_startup_message: true
-  on_threshold_breach: true
-  heartbeat_hours: 12
+  on_threshold_breach: true      # 기준 이탈·센서 오류 자동 경보
+  confirm_count: 3               # 연속 3회(10초 주기 → 30초) 이탈해야 경보 (오경보 방지)
+  remind_minutes: 60             # 이탈이 계속되면 60분마다 재알림 (0 = 끔)
+  include_simulated: false       # 모의값 센서(습도/pH/EC 드라이버 미구현)는 경보 제외
+  hysteresis:                    # 복구 판정 여유값: 기준 안쪽으로 이만큼 들어와야 '복구'
+    temperature: 0.5
+    humidity: 2.0
+    ph: 0.1
+    ec: 0.1
+  heartbeat_hours: 12            # 정기 보고(온도·경고 요약) 간격 (0 = 끔)

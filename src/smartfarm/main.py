@@ -16,6 +16,8 @@ from .actuators.valve import build_valves
 from .notify.telegram import TelegramNotifier
 from .storage.db import Database
 from .status import write_status
+from .alerts import AlertManager
+from .notify import commands
 
 log = get_logger(__name__)
 _running = True
@@ -46,6 +48,10 @@ def main() -> None:
     save_interval = cfg.get("db_save_interval_sec", interval)
     log.info("측정 주기 %s초, DB 저장 주기 %s초", interval, save_interval)
     last_save = None
+    alerts = AlertManager(
+        cfg, notifier.send,
+        heartbeat_text=lambda: commands.cmd_temp() + "\n\n" + commands.cmd_alerts())
+    failing: set[str] = set()       # 읽기 실패 중인 센서 (로그 반복 방지)
 
     try:
         while _running:
@@ -60,8 +66,13 @@ def main() -> None:
                     if save_now:
                         db.save_reading(s.name, s.type, value)
                     log.debug("%s(%s) = %s", s.name, s.type, value)
-                except Exception:  # noqa: BLE001
-                    log.exception("센서 읽기 실패: %s", s.name)
+                    if s.name in failing:
+                        failing.discard(s.name)
+                        log.info("센서 읽기 복구: %s = %s", s.name, value)
+                except Exception as e:  # noqa: BLE001
+                    if s.name not in failing:          # 실패가 이어지는 동안은 첫 1회만 기록
+                        failing.add(s.name)
+                        log.error("센서 읽기 실패: %s — %s", s.name, e)
             if save_now:
                 last_save = started
 
@@ -71,6 +82,10 @@ def main() -> None:
                 write_status(cfg, sensors, readings, valves)
             except Exception:  # noqa: BLE001
                 log.exception("상태 파일 기록 실패")
+            try:
+                alerts.update(sensors, readings)        # 기준 이탈·센서 오류 → 텔레그램 자동 경보
+            except Exception:  # noqa: BLE001
+                log.exception("자동 경보 판단 실패")
 
             # 측정에 걸린 시간을 빼고 대기해 주기를 일정하게 유지
             time.sleep(max(0.0, interval - (time.monotonic() - started)))
@@ -78,13 +93,15 @@ def main() -> None:
         for v in valves:
             v.close_safe()
         db.close()
+        notifier.close()
         log.info("정상 종료")
 
 
 def evaluate_rules(cfg, readings, valves, notifier) -> None:
-    """임계값 판단 및 자동 제어 (구현 예정).
+    """자동 밸브 제어 (구현 예정).
 
-    예) pH/EC가 범위를 벗어나면 해당 밸브를 열고 텔레그램 경보 전송.
+    텔레그램 자동 경보는 alerts.AlertManager 가 담당한다(src/smartfarm/alerts.py).
+    예) pH/EC가 범위를 벗어나면 해당 밸브를 연다.
     """
     # TODO: 실제 제어 로직 구현
     return
