@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>스마트팜 현황</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-inner">
+    <div>
+      <h1>스마트팜 현황</h1>
+      <p class="sub">실시간 센서 · 밸브 상태 (보기 전용)</p>
+    </div>
+    <div class="state" id="state" data-state="unknown">
+      <span class="dot"></span><span id="state-text">확인 중…</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="notice" id="sim-notice" hidden>
+    현재 일부 또는 전체 값은 <strong>센서 미연결 상태의 모의값</strong>입니다.
+    <span class="tag sim">모의값</span> 표시가 있는 항목은 실측값이 아닙니다.
+  </p>
+
+  <section aria-labelledby="h-now">
+    <div class="section-head">
+      <h2 id="h-now">현재 측정값</h2>
+      <span class="muted" id="updated">—</span>
+    </div>
+    <div class="grid" id="sensors"></div>
+  </section>
+
+  <section aria-labelledby="h-chart">
+    <div class="section-head">
+      <h2 id="h-chart">추이</h2>
+      <div class="seg" role="group" aria-label="기간 선택" id="range">
+        <button type="button" data-h="6">6시간</button>
+        <button type="button" data-h="24" aria-pressed="true">24시간</button>
+        <button type="button" data-h="72">3일</button>
+      </div>
+    </div>
+    <div class="charts" id="charts"></div>
+  </section>
+
+  <section aria-labelledby="h-valve">
+    <div class="section-head"><h2 id="h-valve">밸브</h2></div>
+    <ul class="valves" id="valves"></ul>
+  </section>
+</main>
+
+<footer class="wrap foot muted">
+  10초마다 자동 갱신 · 그래프는 구간 평균값 · 시간은 이 기기의 현지 시각
+</footer>
+<script src="/app.js"></script>
+</body>
+</html>

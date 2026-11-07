@@ -15,6 +15,7 @@ from .sensors import build_sensors
 from .actuators.valve import build_valves
 from .notify.telegram import TelegramNotifier
 from .storage.db import Database
+from .status import write_status
 
 log = get_logger(__name__)
 _running = True
@@ -56,6 +57,10 @@ def main() -> None:
 
             # TODO: cfg["rules"] 기반 임계값 판단 → valve 제어 → 이탈 시 notifier.send(...)
             evaluate_rules(cfg, readings, valves, notifier)
+            try:
+                write_status(cfg, sensors, readings, valves)
+            except Exception:  # noqa: BLE001
+                log.exception("상태 파일 기록 실패")
 
             time.sleep(interval)
     finally:

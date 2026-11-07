@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 
 class Sensor(ABC):
     type: str = "unknown"
+    # 마지막 read() 값이 모의값이었는지 여부. 실제 드라이버는 실측 시 False 로 둔다.
+    simulated: bool = True
 
     def __init__(self, spec: dict):
         self.spec = spec

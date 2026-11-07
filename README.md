@@ -8,6 +8,7 @@ Raspberry Pi 3 Model B+ 에서 동작하는 스마트팜 제어 서버입니다.
 - **알림**: 텔레그램(Telegram)으로 상태·경보 메시지 전송
 - **저장**: 측정값을 로컬 SQLite DB에 기록
 - **상시 구동**: systemd 서비스로 부팅 시 자동 실행
+- **공개 웹 대시보드**: 누구나 볼 수 있는 보기 전용 현황 페이지 → https://smartfarm-pi.tail084a13.ts.net/ ([docs/PUBLIC_WEB.md](docs/PUBLIC_WEB.md))
 
 ## 빠른 시작
 ```bash
@@ -29,7 +30,8 @@ smartfarm/
 ├── docs/
 │   ├── SETUP.md              # 설치 / 서비스 등록 가이드
 │   ├── REMOTE_WORK.md        # 다른 PC에서 SSH로 이어서 작업하는 법 ★
-│   └── HARDWARE.md           # 센서/밸브 배선·핀맵 기록
+│   ├── HARDWARE.md           # 센서/밸브 배선·핀맵 기록
+│   └── PUBLIC_WEB.md         # 공개 웹 대시보드 구성·운영
 ├── config/
 │   └── config.example.yaml   # 장비 구성 템플릿 (실제 config.yaml 은 git 제외)
 ├── src/smartfarm/
@@ -38,9 +40,11 @@ smartfarm/
 │   ├── sensors/              # 온도/습도/pH/EC 센서 드라이버
 │   ├── actuators/            # 밸브 제어
 │   ├── notify/               # 텔레그램 전송
-│   └── storage/              # SQLite 저장
+│   ├── storage/              # SQLite 저장
+│   ├── status.py             # 현재 상태 스냅샷(data/status.json) 기록
+│   └── web/                  # 공개(보기 전용) 웹 대시보드 서버 + 화면
 ├── scripts/                  # install.sh, run.sh
-├── systemd/                  # smartfarm.service (자동 실행)
+├── systemd/                  # smartfarm.service, smartfarm-web.service (자동 실행)
 ├── tests/
 ├── data/                     # 런타임 DB (git 제외)
 ├── logs/                     # 로그 (git 제외)

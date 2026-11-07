@@ -1,0 +1,23 @@
+# 스마트팜 공개(보기 전용) 웹 대시보드 — 사용자(--user) 서비스
+# 설치:
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/smartfarm-web.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now smartfarm-web
+# 외부 공개(Tailscale Funnel): docs/PUBLIC_WEB.md 참고
+[Unit]
+Description=Smart Farm public read-only web dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/bsa/smartfarm
+Environment=PYTHONPATH=/home/bsa/smartfarm/src
+ExecStart=/home/bsa/smartfarm/.venv/bin/python -B -m smartfarm.web.public_server --host 127.0.0.1 --port 8081
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=default.target

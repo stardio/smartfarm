@@ -41,6 +41,7 @@ class TemperatureSensor(Sensor):
     def read(self) -> float:
         f = self._device_file()
         if f is None:
+            self.simulated = True
             if not self._warned:
                 log.warning(
                     "DS18B20 %s(addr=%r) 미연결/미설정 → 모의값 사용",
@@ -57,4 +58,5 @@ class TemperatureSensor(Sensor):
         idx = text.find("t=")
         if idx < 0:
             raise RuntimeError(f"DS18B20 {self.name} 온도값 파싱 실패")
+        self.simulated = False
         return round(int(text[idx + 2:]) / 1000.0, 3)

@@ -19,8 +19,11 @@
 - [x] DS18B20 온도센서 3개 지원 구현 (1-Wire, GPIO4 공용 버스, sysfs 읽기, 미연결시 모의값)
 - [x] 현장 PC SSH 키 등록 + 접속 확인 (2026-11-07)
 - [x] Tailscale 설치·합류, 부팅 자동 시작 (2026-11-07)
+- [x] 공개(보기 전용) 웹 대시보드 `smartfarm-web` 서비스 (127.0.0.1:8081) + Tailscale Funnel 공개 (2026-11-07)
+      → https://smartfarm-pi.tail084a13.ts.net/  상세: [PUBLIC_WEB.md](PUBLIC_WEB.md)
 
 ## 접속 방법
+- 공개 대시보드(누구나, 보기 전용): https://smartfarm-pi.tail084a13.ts.net/
 - 현장 로컬망: `ssh bsa@172.30.1.19`
 - 현장/외부 (Tailscale): `ssh bsa@100.96.75.45` (또는 MagicDNS 이름 `smartfarm-pi`)
 - 현장 PC `~/.ssh/config` 별칭: `smartfarm` (로컬망), `smartfarm-ts` (Tailscale)
