@@ -120,3 +120,56 @@ th { color: var(--muted); font-weight: 600; }
 tbody tr:last-child td { border-bottom: 0; }
 [hidden] { display: none !important; }
 .login input.pin { font-size: 1.8rem; letter-spacing: .6em; text-align: center; padding-left: .6em; font-variant-numeric: tabular-nums; }
+
+/* ── 제어 화면 ─────────────────────────────────────── */
+.top-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.btn.danger { background: var(--bad); border-color: var(--bad); }
+.btn.small { padding: 5px 10px; font-size: .82rem; }
+a.btn { display: inline-block; text-decoration: none; text-align: center; }
+.notice.bad { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--card)); }
+.tabs { display: flex; gap: 4px; margin: 20px 0 0; overflow-x: auto; border-bottom: 1px solid var(--line); }
+.tab-btn { font: inherit; font-size: .92rem; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); padding: 8px 12px; cursor: pointer; white-space: nowrap; }
+.tab-btn[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.toast { min-height: 1.4em; margin: 8px 0 0; }
+.toast.ok { color: var(--ok); }
+.tab { margin-top: 12px; }
+.ov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.card.ov { text-align: left; font: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 10px; }
+.card.ov:hover { border-color: var(--accent); }
+.ov-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cells { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.cells.c6 { grid-template-columns: repeat(6, 1fr); }
+.cell { text-align: center; font-size: .78rem; padding: 6px 0; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); }
+.cell.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.cell.off { opacity: .4; }
+.zones { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin: 12px 0; }
+.card.zone { display: flex; flex-direction: column; gap: 4px; }
+.card.zone.on { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.card.zone.disabled { opacity: .55; }
+.zone-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.zreason { font-size: .85rem; min-height: 1.3em; }
+.zsched { font-size: .8rem; overflow-wrap: anywhere; }
+.zctl { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.zctl .mins { width: 7.5em; }
+input[type="number"], input[type="time"], input:not([type]), select {
+  font: inherit; font-size: .88rem; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--text); min-width: 0;
+}
+.form { display: flex; flex-direction: column; gap: 10px; }
+.form h3, .h3 { font-size: .98rem; margin: 16px 0 8px; }
+.form h4 { font-size: .9rem; margin: 8px 0 0; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; align-items: end; }
+.form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); }
+label.check { flex-direction: row !important; align-items: center; gap: 6px; color: var(--text); font-size: .88rem; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.end { justify-content: flex-end; }
+.sched { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.sched .s-dur { width: 5em; }
+.days { display: inline-flex; gap: 2px; flex-wrap: wrap; }
+.day { display: inline-flex; align-items: center; gap: 2px; font-size: .82rem; padding: 2px 4px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); padding: 18px; width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+dialog::backdrop { background: rgba(0, 0, 0, .45); }
+.bar { fill: var(--accent); }
+#nut-form { margin-top: 12px; }
+.card.ov.static { cursor: default; }
+.card.ov.static:hover { border-color: var(--line); }

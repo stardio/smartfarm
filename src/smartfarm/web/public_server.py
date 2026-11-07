@@ -4,7 +4,9 @@
     인터넷 → Tailscale Funnel(HTTPS) → 127.0.0.1:8081 (이 서버)
 
 - 표준 라이브러리만 사용. 루프백 주소에서만 수신한다.
-- 공개 경로는 GET/HEAD 만 허용. 제어(밸브 등) 기능은 없다.
+- 공개 경로는 GET/HEAD 만 허용(보기 전용).
+- /control: 관리자 로그인 후 구역 제어(관수·양액·조명·공조팬·히터). 웹서버는 출력을 직접
+  건드리지 않고 data/control.db 명령 대기열에 넣는다(control_api.py).
 - /admin: 관리자 비밀번호 로그인 후 상세 정보(설정·시스템·로그) 조회. POST 는
   /admin/api/login, /admin/api/logout 두 개뿐이며 Origin 이 같은 사이트일 때만 받는다.
 - 데이터 출처: data/status.json(메인 서버가 기록), data/smartfarm.db(읽기 전용으로 열기).
@@ -29,6 +31,7 @@ from http.cookies import CookieError, SimpleCookie
 from urllib.parse import parse_qs, urlsplit
 
 from . import admin as admin_mod
+from .control_api import REPORT_DAYS, ControlAPI
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB = ROOT / "data" / "smartfarm.db"
@@ -36,7 +39,11 @@ DEFAULT_STATUS = ROOT / "data" / "status.json"
 DEFAULT_CONFIG = ROOT / "config" / "config.yaml"
 DEFAULT_LOG = ROOT / "logs" / "smartfarm.log"
 DEFAULT_ENV = ROOT / ".env"
+DEFAULT_CONTROL_DB = ROOT / "data" / "control.db"
+DEFAULT_CONTROL_STATUS = ROOT / "data" / "control.json"
 MAX_BODY = 2048
+MAX_CONTROL_BODY = 16384
+CONTROL_POSTS = ("/admin/api/control/command", "/admin/api/control/config")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 SENSOR_TYPES = ("temperature", "humidity", "ph", "ec")
@@ -54,6 +61,8 @@ STATIC_FILES = {
     "/admin": ("admin.html", "text/html; charset=utf-8"),
     "/admin/": ("admin.html", "text/html; charset=utf-8"),
     "/admin.js": ("admin.js", "text/javascript; charset=utf-8"),
+    "/control": ("control.html", "text/html; charset=utf-8"),
+    "/control.js": ("control.js", "text/javascript; charset=utf-8"),
 }
 
 SECURITY_HEADERS = {
@@ -203,6 +212,7 @@ class Handler(BaseHTTPRequestHandler):
     data: DataSource            # make_server 에서 주입
     auth: admin_mod.AdminAuth
     paths: dict
+    control: ControlAPI
 
     # 접근 로그는 남기지 않는다(공개 서버, journal 용량 절약)
     def log_message(self, format, *args):  # noqa: A002
@@ -291,6 +301,9 @@ class Handler(BaseHTTPRequestHandler):
                 hours = 24
             return self._json(self.data.history(hours))
 
+        if path == "/api/public/control":
+            return self._json(self.control.public())
+
         if path == "/api/v1/health":
             st = self.data.status()
             return self._json({"state": st["state"], "updated_at": st["updated_at"]})
@@ -309,13 +322,41 @@ class Handler(BaseHTTPRequestHandler):
             data["status"] = self.data.status()
             return self._json(data)
 
+        if path.startswith("/admin/api/control/"):
+            if not self._is_admin():
+                return self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "login_required"})
+            q = parse_qs(url.query)
+            try:
+                days = int(q.get("days", ["7"])[0])
+            except ValueError:
+                days = 7
+            days = days if days in REPORT_DAYS else 7
+            if path == "/admin/api/control/state":
+                return self._json(self.control.admin_state(self.auth.kind == "pin"))
+            if path == "/admin/api/control/report":
+                return self._json(self.control.report(days))
+            if path == "/admin/api/control/report.csv":
+                body = self.control.report_csv(days)
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition",
+                                 f'attachment; filename="smartfarm-report-{days}d.csv"')
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                for k, v in SECURITY_HEADERS.items():
+                    self.send_header(k, v)
+                self.end_headers()
+                if self.command != "HEAD":
+                    self.wfile.write(body)
+                return None
+
         return self._not_found()
 
     do_HEAD = do_GET  # noqa: N815
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlsplit(self.path).path
-        if path not in ("/admin/api/login", "/admin/api/logout"):
+        if path not in ("/admin/api/login", "/admin/api/logout") + CONTROL_POSTS:
             return self._method_not_allowed()
         if not self._same_origin():
             return self._send_json(HTTPStatus.FORBIDDEN, {"error": "bad_origin"})
@@ -323,9 +364,13 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             length = -1
-        if length < 0 or length > MAX_BODY:
+        limit = MAX_CONTROL_BODY if path in CONTROL_POSTS else MAX_BODY
+        if length < 0 or length > limit:
             return self._send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "too_large"})
         raw = self.rfile.read(length) if length else b""
+
+        if path in CONTROL_POSTS:
+            return self._control_post(path, raw)
 
         if path == "/admin/api/logout":
             self.auth.logout(self._session_token())
@@ -353,6 +398,25 @@ class Handler(BaseHTTPRequestHandler):
         return self._send_json(HTTPStatus.OK, {"ok": True},
                                {"Set-Cookie": self._cookie(token, self.auth.ABSOLUTE_SEC)})
 
+    def _control_post(self, path: str, raw: bytes) -> None:
+        if not self._is_admin():
+            return self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "login_required"})
+        if self.auth.kind == "pin" and self.control.hardware_real():
+            return self._send_json(HTTPStatus.FORBIDDEN, {
+                "error": "strong_password_required",
+                "message": "실제 출력을 사용하는 동안에는 PIN 으로 제어할 수 없습니다. 10자 이상 비밀번호로 바꾸세요."})
+        try:
+            body = json.loads(raw or b"{}")
+        except ValueError:
+            body = None
+        if not isinstance(body, dict):
+            return self._send_json(HTTPStatus.BAD_REQUEST, {"error": "bad_json"})
+        if path == "/admin/api/control/command":
+            status, obj = self.control.command(body)
+        else:
+            status, obj = self.control.save_config(body)
+        return self._send_json(status, obj)
+
     def _method_not_allowed(self) -> None:
         self.send_response(HTTPStatus.METHOD_NOT_ALLOWED)
         self.send_header("Allow", "GET, HEAD")
@@ -364,11 +428,14 @@ class Handler(BaseHTTPRequestHandler):
 
 def make_server(host: str, port: int, db_path: Path, status_path: Path,
                 admin_hash: str | None = None, config_path: Path = DEFAULT_CONFIG,
-                log_path: Path = DEFAULT_LOG, admin_kind: str = "password") -> ThreadingHTTPServer:
+                log_path: Path = DEFAULT_LOG, admin_kind: str = "password",
+                control_db: Path = DEFAULT_CONTROL_DB,
+                control_status: Path = DEFAULT_CONTROL_STATUS) -> ThreadingHTTPServer:
     handler = type("BoundHandler", (Handler,), {
         "data": DataSource(db_path, status_path),
         "auth": admin_mod.AdminAuth(admin_hash, admin_kind),
         "paths": {"root": ROOT, "db": Path(db_path), "config": Path(config_path), "log": Path(log_path)},
+        "control": ControlAPI(control_db, control_status, config_path),
     })
     httpd = ThreadingHTTPServer((host, port), handler)
     httpd.daemon_threads = True

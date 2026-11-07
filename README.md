@@ -8,6 +8,7 @@ Raspberry Pi 3 Model B+ 에서 동작하는 스마트팜 제어 서버입니다.
 - **알림**: 텔레그램(Telegram)으로 상태·경보 메시지 전송, 봇 명령 `/status` `/temp` `/alerts` `/help` 응답 ([docs/TELEGRAM.md](docs/TELEGRAM.md))
 - **저장**: 측정값을 로컬 SQLite DB에 기록
 - **상시 구동**: systemd 서비스로 부팅 시 자동 실행
+- **구역 제어**: 관수 8·양액·조명 8·공조팬 8·히터 8 — 스케줄·온도 조건·리포트, 웹 제어 화면 /control ([docs/CONTROL.md](docs/CONTROL.md))
 - **공개 웹 대시보드**: 누구나 볼 수 있는 보기 전용 현황 페이지 → https://smartfarm-pi.tail084a13.ts.net/ ([docs/PUBLIC_WEB.md](docs/PUBLIC_WEB.md))
 
 ## 빠른 시작

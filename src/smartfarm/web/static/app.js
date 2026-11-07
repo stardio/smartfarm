@@ -267,3 +267,42 @@
 
   start();
 })();
+
+// ── 구역 현황 (보기 전용) ──────────────────────────────
+(function () {
+  var box = document.getElementById("control");
+  if (!box) return;
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function load() {
+    if (document.hidden) return;
+    fetch("/api/public/control", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (d) {
+      box.textContent = "";
+      document.getElementById("control-note").textContent =
+        d.state !== "ok" ? "제어기 응답 없음" : (d.paused ? "전체 정지 중" : "");
+      (d.systems || []).forEach(function (s) {
+        var c = el("div", "card ov static");
+        var h = el("div", "ov-head");
+        var on = s.zones.filter(function (z) { return z.on; }).length;
+        h.appendChild(el("strong", null, s.name));
+        h.appendChild(el("span", "pill" + (on ? " open" : ""), "켜짐 " + on + "/" + s.zones.length));
+        c.appendChild(h);
+        var cells = el("div", "cells");
+        s.zones.forEach(function (z) {
+          var x = el("span", "cell" + (z.on ? " on" : "") + (z.enabled ? "" : " off"), String(z.zone));
+          x.title = z.name + (z.on ? " · 켜짐" : " · 꺼짐");
+          cells.appendChild(x);
+        });
+        c.appendChild(cells);
+        box.appendChild(c);
+      });
+    }).catch(function () { /* 다음 주기에 재시도 */ });
+  }
+  load();
+  setInterval(load, 10000);
+  document.addEventListener("visibilitychange", load);
+})();

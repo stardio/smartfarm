@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex, nofollow">
+<title>스마트팜 제어</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-inner">
+    <div>
+      <h1>스마트팜 제어</h1>
+      <p class="sub"><a href="/">공개 현황</a> · <a href="/admin">관리자 정보</a></p>
+    </div>
+    <div class="top-actions">
+      <span class="state" id="ctl-state" data-state="unknown"><span class="dot"></span><span id="ctl-state-text">확인 중…</span></span>
+      <button type="button" class="btn danger" id="pause-btn" hidden>전체 정지</button>
+      <button type="button" class="btn" id="resume-btn" hidden>자동 운전 재개</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="login-needed" hidden>
+    <div class="card login">
+      <h2>로그인이 필요합니다</h2>
+      <p class="muted">제어 화면은 관리자만 사용할 수 있습니다.</p>
+      <a class="btn" href="/admin">관리자 로그인</a>
+    </div>
+  </section>
+
+  <div id="ctl-view" hidden>
+    <p class="notice" id="mock-notice" hidden>
+      <strong>시뮬레이션 모드</strong> — 실제 릴레이가 아직 연결되지 않아 켜기/끄기는 화면과 기록에만 반영됩니다.
+      스케줄·설정·리포트는 실제와 똑같이 동작하므로 미리 설정해 둘 수 있습니다.
+    </p>
+    <p class="notice bad" id="paused-notice" hidden>
+      <strong>전체 정지 중</strong> — 모든 출력이 꺼져 있고 스케줄·자동 운전이 멈춰 있습니다.
+    </p>
+    <p class="notice bad" id="stale-notice" hidden>
+      제어기(측정 서버)가 응답하지 않습니다. <code>systemctl --user status smartfarm</code> 을 확인하세요.
+    </p>
+    <p class="notice bad" id="denied-notice" hidden>
+      실제 출력이 연결된 상태에서는 4자리 PIN 으로 제어할 수 없습니다. 10자 이상 비밀번호로 바꾸세요.
+    </p>
+
+    <nav class="tabs" id="tabs" role="tablist" aria-label="시스템"></nav>
+    <p class="msg toast" id="toast" role="status"></p>
+
+    <section id="tab-overview" class="tab" hidden>
+      <div class="ov-grid" id="overview"></div>
+    </section>
+
+    <section id="tab-zones" class="tab" hidden>
+      <div class="section-head">
+        <div>
+          <h2 id="zones-title">—</h2>
+          <p class="muted" id="zones-help"></p>
+        </div>
+        <div class="muted" id="zones-extra"></div>
+      </div>
+      <div class="zones" id="zones"></div>
+    </section>
+
+    <section id="tab-nutrient" class="tab" hidden>
+      <div class="section-head">
+        <div>
+          <h2>양액</h2>
+          <p class="muted">EC·pH 를 보고 A·B 액과 산을 조금씩 넣은 뒤, 섞일 때까지 기다렸다가 다시 측정합니다.</p>
+        </div>
+      </div>
+      <div class="grid" id="nut-now"></div>
+      <p class="muted" id="nut-phase"></p>
+      <div class="zones" id="nut-channels"></div>
+      <form class="card form" id="nut-form">
+        <h3>자동 투입 설정</h3>
+        <label class="check"><input type="checkbox" name="auto"> 자동 투입 사용</label>
+        <p class="muted">EC·pH 센서가 실측값일 때만 동작합니다(지금 모의값이면 대기).</p>
+        <div class="form-grid">
+          <label>EC 센서 <select name="ec_sensor"></select></label>
+          <label>목표 EC (mS/cm) <input name="ec_target" type="number" step="0.05" min="0.1" max="6"></label>
+          <label>EC 허용 편차 <input name="ec_band" type="number" step="0.05" min="0.05" max="2"></label>
+          <label>pH 센서 <select name="ph_sensor"></select></label>
+          <label>목표 pH <input name="ph_target" type="number" step="0.05" min="4" max="8"></label>
+          <label>pH 허용 편차 <input name="ph_band" type="number" step="0.05" min="0.05" max="2"></label>
+          <label>1회 투입 (초) <input name="dose_sec" type="number" step="1" min="1" max="60"></label>
+          <label>교반 대기 (초) <input name="mix_sec" type="number" step="10" min="30" max="3600"></label>
+          <label>하루 최대 투입 횟수 <input name="max_doses_per_day" type="number" step="1" min="1" max="200"></label>
+        </div>
+        <div class="row"><button type="submit" class="btn">저장</button></div>
+      </form>
+    </section>
+
+    <section id="tab-report" class="tab" hidden>
+      <div class="section-head">
+        <h2>운전 리포트</h2>
+        <div class="row">
+          <div class="seg" role="group" aria-label="기간" id="rep-days">
+            <button type="button" data-d="1">오늘</button>
+            <button type="button" data-d="7" aria-pressed="true">7일</button>
+            <button type="button" data-d="30">30일</button>
+            <button type="button" data-d="90">90일</button>
+          </div>
+          <a class="btn ghost" id="rep-csv" href="/admin/api/control/report.csv?days=7">CSV 내려받기</a>
+        </div>
+      </div>
+      <div class="chart"><h3><span>일별 관수 시간</span><span class="muted" id="rep-total"></span></h3><div id="rep-chart"></div></div>
+      <h3 class="h3">구역별 합계</h3>
+      <div class="table-wrap"><table id="rep-sum"></table></div>
+      <h3 class="h3">최근 운전 기록</h3>
+      <div class="table-wrap"><table id="rep-runs"></table></div>
+    </section>
+  </div>
+</main>
+
+<dialog id="editor">
+  <form method="dialog" id="ed-form" class="form">
+    <h3 id="ed-title">구역 설정</h3>
+    <div class="form-grid">
+      <label>이름 <input name="zname" maxlength="20" required></label>
+      <label class="check"><input type="checkbox" name="enabled"> 사용</label>
+    </div>
+    <div id="ed-flow" class="form-grid">
+      <label>유량 (L/분) <input name="flow_lpm" type="number" step="0.1" min="0" max="1000"></label>
+      <p class="muted">입력하면 리포트에 물 사용량이 계산됩니다.</p>
+    </div>
+    <h4>스케줄</h4>
+    <p class="muted" id="ed-sched-help"></p>
+    <div id="ed-scheds"></div>
+    <button type="button" class="btn ghost small" id="ed-add">+ 스케줄 추가</button>
+    <div id="ed-thermo">
+      <h4>온도 조건</h4>
+      <p class="muted" id="ed-thermo-help"></p>
+      <div class="form-grid">
+        <label class="check"><input type="checkbox" name="t_enabled"> 온도 조건 사용</label>
+        <label>온도센서 <select name="t_sensor"></select></label>
+        <label>설정온도 (°C) <input name="t_setpoint" type="number" step="0.5" min="-10" max="50"></label>
+        <label>편차 (°C) <input name="t_hysteresis" type="number" step="0.1" min="0.1" max="10"></label>
+        <label id="ed-cutoff">과열 차단 (°C) <input name="cutoff" type="number" step="1" min="10" max="60"></label>
+      </div>
+    </div>
+    <p class="msg" id="ed-msg" role="alert"></p>
+    <div class="row end">
+      <button type="button" class="btn ghost" id="ed-cancel">취소</button>
+      <button type="button" class="btn" id="ed-save">저장</button>
+    </div>
+  </form>
+</dialog>
+
+<footer class="wrap foot muted">상태는 2초마다 갱신 · 명령은 1초 안에 반영 · 시간은 Pi 기준(한국 시간)</footer>
+<script src="/control.js"></script>
+</body>
+</html>

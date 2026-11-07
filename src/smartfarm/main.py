@@ -18,6 +18,7 @@ from .storage.db import Database
 from .status import write_status
 from .alerts import AlertManager
 from .notify import commands
+from .control.engine import Controller
 
 log = get_logger(__name__)
 _running = True
@@ -52,6 +53,9 @@ def main() -> None:
         cfg, notifier.send,
         heartbeat_text=lambda: commands.cmd_temp() + "\n\n" + commands.cmd_alerts())
     failing: set[str] = set()       # 읽기 실패 중인 센서 (로그 반복 방지)
+    # 구역 제어기(관수·양액·조명·공조팬·히터): 1초 주기 별도 스레드
+    controller = Controller(cfg, notify=notifier.send)
+    controller.start()
 
     try:
         while _running:
@@ -75,6 +79,7 @@ def main() -> None:
                         log.error("센서 읽기 실패: %s — %s", s.name, e)
             if save_now:
                 last_save = started
+            controller.set_readings(sensors, readings)
 
             # TODO: cfg["rules"] 기반 임계값 판단 → valve 제어 → 이탈 시 notifier.send(...)
             evaluate_rules(cfg, readings, valves, notifier)
@@ -90,6 +95,7 @@ def main() -> None:
             # 측정에 걸린 시간을 빼고 대기해 주기를 일정하게 유지
             time.sleep(max(0.0, interval - (time.monotonic() - started)))
     finally:
+        controller.stop()
         for v in valves:
             v.close_safe()
         db.close()

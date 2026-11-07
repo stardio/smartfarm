@@ -60,3 +60,14 @@ alerts:
     ph: 0.1
     ec: 0.1
   heartbeat_hours: 12            # 정기 보고(온도·경고 요약) 간격 (0 = 끔)
+
+# ── 구역 제어 (관수·양액·조명·공조팬·히터) ─────────────────
+# 구역 이름·스케줄·설정온도는 웹 제어 화면(/control)에서 바꾸며 data/control.db 에 저장된다.
+# 여기서는 하드웨어 연결만 정한다. 자세한 내용: docs/CONTROL.md
+control:
+  hardware: mock          # mock = 실제 출력 없음(시뮬레이션). 릴레이 보드 확정 후 드라이버 추가
+  irrigation:
+    max_concurrent: 1     # 동시에 관수할 수 있는 구역 수(수압·펌프 용량). 나머지는 대기열
+    pump: true            # 관수 중 주 펌프 출력(irrigation.pump) 함께 켜기
+  # channels:             # 채널별 실제 출력 지정 예 (키 = 시스템.구역)
+  #   irrigation.1: { driver: gpio, pin: 5, active_high: false }
