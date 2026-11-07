@@ -33,10 +33,8 @@
 - git push/pull 은 Pi의 deploy key(`~/.ssh/github_smartfarm`)로 인증됨 — 추가 설정 불필요.
 
 ## 남은 작업 (TODO)
-1. **1-Wire 활성화 + 센서 주소 등록** (sudo, 배선 후):
-   `sudo raspi-config nonint do_onewire 0 && sudo reboot`
-   `bash scripts/detect_ds18b20.sh`  → 나온 28-... 주소를 `config/config.yaml` temp_1/2/3 에 입력
-   `systemctl --user restart smartfarm`
+1. ~~1-Wire 활성화 + 센서 주소 등록~~ → 완료(2026-11-07). DS18B20 3개 실측 중, 주소는 docs/HARDWARE.md.
+   센서 위치(어느 주소가 어디 설치)는 아직 미기록 — 확인 후 HARDWARE.md 비고에 적을 것.
 2. **GPIO 백엔드 연결** (밸브 실제 제어): `python3-lgpio` 는 apt 로 설치되어 있으나
    `.venv` 가 `include-system-site-packages = false` 라 venv 에서 import 되지 않음.
    → venv 에서 시스템 패키지를 보이게 하거나 venv 재생성 필요.

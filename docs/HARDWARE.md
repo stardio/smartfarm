@@ -14,9 +14,9 @@
 
 | 이름 | 종류 | 버스핀(BCM) | 주소(ROM) | 비고 |
 |---|---|---|---|---|
-| temp_1 | DS18B20 | GPIO4 | 28-xxxxxxxxxxxx | 설치 후 실제 주소 입력 |
-| temp_2 | DS18B20 | GPIO4 | 28-xxxxxxxxxxxx | |
-| temp_3 | DS18B20 | GPIO4 | 28-xxxxxxxxxxxx | |
+| temp_1 | DS18B20 | GPIO4 | 28-000000d6c59d | 2026-11-07 연결 확인 |
+| temp_2 | DS18B20 | GPIO4 | 28-000000d7809f | 2026-11-07 연결 확인 |
+| temp_3 | DS18B20 | GPIO4 | 28-000000d7ab56 | 2026-11-07 연결 확인 |
 
 **배선 (3개 공통/병렬):**
 - VDD  → 3.3V (물리 1번)
