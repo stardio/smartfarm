@@ -8,14 +8,16 @@
 
 | 항목 | 값 |
 |---|---|
-| 접속 주소 | `bsa@192.168.0.81` |
+| 접속 주소 (현장 로컬망) | `bsa@172.30.1.19` |
+| 접속 주소 (Tailscale, 외부) | `bsa@100.96.75.45` (이름 `smartfarm-pi`) |
 | 모델 | Raspberry Pi 3 Model B+ |
 | OS | Raspberry Pi OS 64-bit (Debian 13 trixie) |
 | Python | 3.13 (프로젝트는 `~/smartfarm/.venv` 가상환경 사용) |
 | 프로젝트 경로 | `/home/bsa/smartfarm` |
 
 > IP는 공유기 설정에 따라 바뀔 수 있습니다. 바뀌면 공유기 관리페이지에서
-> MAC `b8:27:eb:9c:ea:97` 에 할당된 IP를 확인하세요. (고정 IP 할당 권장)
+> 유선(eth0) MAC `b8:27:eb:c9:bf:c2` 에 할당된 IP를 확인하세요. (고정 IP 할당 권장)
+> 외부망에서는 Tailscale 주소를 쓰면 IP 변경과 무관하게 접속됩니다. (접속 PC도 같은 Tailscale 계정에 로그인 필요)
 
 ---
 
@@ -30,27 +32,33 @@ passphrase는 비워 두거나(자동 접속 편함), 보안을 위해 설정해
 ### 1-2. 공개키를 라즈베리파이에 등록
 **Windows PowerShell:**
 ```powershell
-type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh bsa@192.168.0.81 "cat >> ~/.ssh/authorized_keys"
+type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh bsa@172.30.1.19 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
 ```
 **Linux / macOS:**
 ```bash
-ssh-copy-id bsa@192.168.0.81
+ssh-copy-id bsa@172.30.1.19
 ```
 비밀번호를 한 번 입력하면 등록됩니다. 이후부터는 비밀번호 없이 접속됩니다.
 
 ### 1-3. 접속 테스트
 ```bash
-ssh bsa@192.168.0.81
+ssh bsa@172.30.1.19      # 로컬망
+ssh bsa@100.96.75.45     # Tailscale
 ```
 
 ### (선택) 접속 별칭 설정 — `~/.ssh/config` 에 추가
 ```
-Host pi-farm
-    HostName 192.168.0.81
+Host smartfarm
+    HostName 172.30.1.19
+    User bsa
+    IdentityFile ~/.ssh/id_ed25519
+
+Host smartfarm-ts
+    HostName 100.96.75.45
     User bsa
     IdentityFile ~/.ssh/id_ed25519
 ```
-이후 `ssh pi-farm` 으로 짧게 접속할 수 있습니다.
+이후 `ssh smartfarm` (로컬망) / `ssh smartfarm-ts` (Tailscale) 로 짧게 접속할 수 있습니다.
 
 ---
 
@@ -77,7 +85,7 @@ source .venv/bin/activate
 
 ### 방법 A — VS Code 원격 접속 (가장 편리, 권장)
 새 PC의 VS Code에 **"Remote - SSH"** 확장을 설치한 뒤:
-1. `F1` → `Remote-SSH: Connect to Host` → `bsa@192.168.0.81`
+1. `F1` → `Remote-SSH: Connect to Host` → `smartfarm` 또는 `smartfarm-ts`
 2. 열린 창에서 `File > Open Folder` → `/home/bsa/smartfarm`
 
 라즈베리파이의 파일을 로컬처럼 편집·실행·디버깅할 수 있습니다.
@@ -125,14 +133,15 @@ git add -A && git commit -m "작업내용" && git push
 ## 5. 서버 상태 확인·제어 (자주 쓰는 명령)
 
 ```bash
+# 사용자(--user) 서비스이므로 sudo 불필요
 # 서비스 상태
-sudo systemctl status smartfarm
+systemctl --user status smartfarm
 # 실시간 로그
-journalctl -u smartfarm -f
+journalctl --user -u smartfarm -f     # 또는 tail -f logs/smartfarm.log
 # 재시작 / 중지 / 시작
-sudo systemctl restart smartfarm
-sudo systemctl stop smartfarm
-sudo systemctl start smartfarm
+systemctl --user restart smartfarm
+systemctl --user stop smartfarm
+systemctl --user start smartfarm
 # 수동 실행(디버깅용, 서비스 끈 상태에서)
 source .venv/bin/activate && python -m smartfarm.main
 ```
@@ -142,8 +151,8 @@ source .venv/bin/activate && python -m smartfarm.main
 ## 6. 체크리스트 (새 PC에서 처음 이어받을 때)
 
 - [ ] SSH 키 등록 완료 (1번)
-- [ ] `ssh bsa@192.168.0.81` 접속 확인
+- [ ] `ssh bsa@172.30.1.19` (또는 Tailscale `ssh bsa@100.96.75.45`) 접속 확인
 - [ ] (git 사용 시) `git pull` 로 최신 코드 확보
 - [ ] `source .venv/bin/activate`
 - [ ] `.env`, `config/config.yaml` 존재 확인 (없으면 템플릿 복사 후 값 입력)
-- [ ] `sudo systemctl status smartfarm` 로 서버 동작 확인
+- [ ] `systemctl --user status smartfarm` 로 서버 동작 확인

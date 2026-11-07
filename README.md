@@ -50,7 +50,8 @@ smartfarm/
 ```
 
 ## 장비 정보
-- 호스트: `bsa@192.168.0.81` (Raspberry Pi 3 Model B+)
+- 호스트: `bsa@172.30.1.19` (현장 로컬망) / `bsa@100.96.75.45` (Tailscale `smartfarm-pi`)
+- 모델: Raspberry Pi 3 Model B+
 - OS: Raspberry Pi OS 64-bit (Debian 13 trixie), Python 3.13
 
 > 다른 컴퓨터에서 이어서 작업하려면 반드시 **[docs/REMOTE_WORK.md](docs/REMOTE_WORK.md)** 를 먼저 읽으세요.

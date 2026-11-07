@@ -49,25 +49,30 @@ python -m smartfarm.main
 
 ## 5. 서비스 등록 (부팅 시 자동 실행)
 
+현재 장비는 **사용자(--user) systemd 서비스 + linger** 방식으로 등록되어 있습니다.
+(`systemd/smartfarm.service` 는 시스템 서비스용이라, 사용자 서비스로 쓸 때는 `User=` 줄을
+빼고 `WantedBy=default.target` 으로 바꿔 설치합니다.)
+
 ```bash
-# 서비스 파일 설치
-sudo cp systemd/smartfarm.service /etc/systemd/system/smartfarm.service
-sudo systemctl daemon-reload
-sudo systemctl enable smartfarm     # 부팅 자동 실행 등록
-sudo systemctl start smartfarm      # 지금 시작
-sudo systemctl status smartfarm     # 상태 확인
+# 서비스 파일 설치 (사용자 서비스)
+mkdir -p ~/.config/systemd/user
+sed -e '/^User=/d' -e 's/multi-user.target/default.target/'     systemd/smartfarm.service > ~/.config/systemd/user/smartfarm.service
+systemctl --user daemon-reload
+systemctl --user enable --now smartfarm   # 부팅 자동 실행 등록 + 지금 시작
+sudo loginctl enable-linger bsa           # 로그인 없이도 부팅 시 실행 (최초 1회, sudo)
+systemctl --user status smartfarm         # 상태 확인
 ```
 
 로그 보기:
 ```bash
-journalctl -u smartfarm -f
+journalctl --user -u smartfarm -f     # 또는 tail -f logs/smartfarm.log
 ```
 
 ## 6. 업데이트 반영
 
 코드 변경 후:
 ```bash
-sudo systemctl restart smartfarm
+systemctl --user restart smartfarm
 ```
 패키지 추가 시:
 ```bash
