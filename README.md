@@ -5,7 +5,7 @@ Raspberry Pi 3 Model B+ 에서 동작하는 스마트팜 제어 서버입니다.
 ## 기능
 - **센싱**: 온도 / 습도 / pH / EC 센서 (각각 여러 개) 주기적 측정
 - **제어**: 여러 개의 밸브(valve) 개폐 제어
-- **알림**: 텔레그램(Telegram)으로 상태·경보 메시지 전송
+- **알림**: 텔레그램(Telegram)으로 상태·경보 메시지 전송, 봇 명령 `/status` `/temp` `/alerts` `/help` 응답 ([docs/TELEGRAM.md](docs/TELEGRAM.md))
 - **저장**: 측정값을 로컬 SQLite DB에 기록
 - **상시 구동**: systemd 서비스로 부팅 시 자동 실행
 - **공개 웹 대시보드**: 누구나 볼 수 있는 보기 전용 현황 페이지 → https://smartfarm-pi.tail084a13.ts.net/ ([docs/PUBLIC_WEB.md](docs/PUBLIC_WEB.md))
@@ -39,7 +39,7 @@ smartfarm/
 │   ├── core/                 # 설정 로더, 로깅
 │   ├── sensors/              # 온도/습도/pH/EC 센서 드라이버
 │   ├── actuators/            # 밸브 제어
-│   ├── notify/               # 텔레그램 전송
+│   ├── notify/               # 텔레그램 전송 + 명령 응답 봇(bot.py)
 │   ├── storage/              # SQLite 저장
 │   ├── status.py             # 현재 상태 스냅샷(data/status.json) 기록
 │   └── web/                  # 공개(보기 전용) 웹 대시보드 서버 + 화면

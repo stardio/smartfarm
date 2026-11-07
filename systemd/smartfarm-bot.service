@@ -1,0 +1,24 @@
+# 스마트팜 텔레그램 봇 (/status /temp /alerts /help 응답) — 사용자(--user) 서비스
+# 설치:
+#   cp systemd/smartfarm-bot.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now smartfarm-bot
+# 토큰·chat id 설정: PYTHONPATH=src .venv/bin/python -m smartfarm.notify.setup_bot
+# 자세한 내용: docs/TELEGRAM.md
+[Unit]
+Description=Smart Farm Telegram bot (command replies)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/bsa/smartfarm
+Environment=PYTHONPATH=/home/bsa/smartfarm/src
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/bsa/smartfarm/.venv/bin/python -B -m smartfarm.notify.bot
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=default.target

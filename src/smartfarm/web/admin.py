@@ -265,7 +265,7 @@ def config_info(config_path: Path) -> dict:
 
 def overview(root: Path, db_path: Path, config_path: Path, log_path: Path) -> dict:
     return {
-        "services": {n: _service_state(n) for n in ("smartfarm", "smartfarm-web")},
+        "services": {n: _service_state(n) for n in ("smartfarm", "smartfarm-web", "smartfarm-bot")},
         "system": system_info(root),
         "db": db_info(db_path),
         "config": config_info(config_path),

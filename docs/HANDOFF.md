@@ -39,7 +39,9 @@
    `.venv` 가 `include-system-site-packages = false` 라 venv 에서 import 되지 않음.
    → venv 에서 시스템 패키지를 보이게 하거나 venv 재생성 필요.
    **주의: 적용 후 재시작하면 배선된 밸브가 실제로 동작함.**
-3. **텔레그램 설정**: `.env` 의 BOT_TOKEN 이 아직 템플릿 문구 그대로 → 실제 토큰/CHAT_ID 입력 후 restart
+3. **텔레그램 설정**: 봇(`/status /temp /alerts /help`) 코드·서비스(smartfarm-bot)는 완료(2026-11-07).
+   토큰·chat id 만 입력하면 동작 → `ssh -t smartfarm "cd ~/smartfarm && PYTHONPATH=src .venv/bin/python -m smartfarm.notify.setup_bot"`
+   (docs/TELEGRAM.md)
 4. **습도/pH/EC 드라이버 실제 구현** (`src/smartfarm/sensors/humidity.py, ph.py, ec.py`의 TODO)
 5. **자동제어 로직 구현**: `src/smartfarm/main.py` 의 `evaluate_rules()` — 임계값 이탈시 밸브 제어 + 텔레그램 경보
 6. (참고) RTK Base 폴더 `~/raspberrypi_RTK_base/` 에 재활용 가능한 DS18B20 다중센서 코드 있음.
