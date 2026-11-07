@@ -6,6 +6,7 @@
 
 ## 장비
 - Raspberry Pi 3 Model B+, 사용자 `bsa`, Raspberry Pi OS 64-bit (Debian 13, Python 3.13)
+- 데스크톱(GUI) 끔: 콘솔 부팅(multi-user.target, 2026-11-07). SSH 전용. 되돌리기: `sudo raspi-config nonint do_boot_behaviour B4`
 - 현장 로컬망 IP: `172.30.1.19` (eth0, MAC `b8:27:eb:c9:bf:c2`) — 공유기에서 고정 할당 권장
 - Tailscale: 이름 `smartfarm-pi`, IP `100.96.75.45` (RTK Base `rtk-base-pi` 와 동일 tailnet)
 - (이전) 사무실망 IP: 192.168.0.81
