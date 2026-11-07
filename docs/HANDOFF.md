@@ -23,6 +23,7 @@
       → https://smartfarm-pi.tail084a13.ts.net/  상세: [PUBLIC_WEB.md](PUBLIC_WEB.md)
 - [x] 관리자 페이지 `/admin` (비밀번호 로그인, 보기 전용 상세 정보) (2026-11-07)
       비밀번호 설정(숫자 4자리 PIN 또는 10자 이상): `PYTHONPATH=src .venv/bin/python -m smartfarm.web.admin_password`
+      ⚠ 현재 테스트용 4자리 PIN(로그인 잠금 없음). **운영 전 10자 이상 비밀번호로 변경**하면 잠금 자동 적용.
 
 ## 접속 방법
 - 공개 대시보드(누구나, 보기 전용): https://smartfarm-pi.tail084a13.ts.net/

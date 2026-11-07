@@ -10,6 +10,7 @@ import json
 import sqlite3
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -224,13 +225,24 @@ class PinTest(unittest.TestCase):
                 httpd.shutdown()
                 httpd.server_close()
 
+    def test_pin_mode_has_no_lockout(self):
+        auth = admin.AdminAuth(admin.hash_password("1111"), "pin")
+        self.assertFalse(auth.lockout_enabled)
+        t0 = time.monotonic()
+        for _ in range(50):
+            self.assertIsNone(auth.login("2222"))
+        self.assertLess(time.monotonic() - t0, 10)       # 실패 지연 없음(scrypt 계산 시간만)
+        self.assertEqual(auth.locked_for(), 0)
+        self.assertIsNotNone(auth.login("1111"))          # 바로 로그인 가능
+
     def test_lock_duration_escalates_and_caps(self):
-        auth = admin.AdminAuth(admin.hash_password("4827"), "pin")
+        auth = admin.AdminAuth(admin.hash_password("a-long-password"), "password")
+        self.assertTrue(auth.lockout_enabled)
         auth.FAIL_DELAY_SEC = 0
         durations = []
         for _ in range(9):
             for _ in range(auth.FAIL_LIMIT):
-                auth.login("0000")
+                auth.login("wrong-password")
             durations.append(auth.locked_for())
             auth._locked_until = 0          # 잠금 시간 경과를 흉내
         base = auth.LOCK_SEC
@@ -239,9 +251,9 @@ class PinTest(unittest.TestCase):
         self.assertAlmostEqual(durations[2], base * 4, delta=2)
         self.assertAlmostEqual(durations[-1], auth.LOCK_MAX_SEC, delta=2)
         # 성공하면 단계 초기화
-        self.assertIsNotNone(auth.login("4827"))
+        self.assertIsNotNone(auth.login("a-long-password"))
         for _ in range(auth.FAIL_LIMIT):
-            auth.login("0000")
+            auth.login("wrong-password")
         self.assertAlmostEqual(auth.locked_for(), base, delta=2)
 
     def test_write_hash_stores_kind(self):

@@ -3,7 +3,7 @@
     cd ~/smartfarm && PYTHONPATH=src .venv/bin/python -m smartfarm.web.admin_password
     systemctl --user restart smartfarm-web
 
-형식: 숫자 4자리 PIN 또는 10자 이상 비밀번호.
+형식: 숫자 4자리 PIN(테스트용, 로그인 잠금 없음) 또는 10자 이상 비밀번호(운영용, 로그인 잠금 사용).
 비밀번호는 화면에 표시되지 않고, scrypt 해시만 .env 의 ADMIN_PASSWORD_HASH 에 저장된다.
 형식(pin/password)은 ADMIN_PASSWORD_KIND 에 저장되어 로그인 화면 입력 방식에 쓰인다.
 변경하면 웹서버 재시작 시 기존 로그인 세션은 모두 끊긴다.
@@ -48,20 +48,17 @@ def write_hash(env_path: Path, value: str, kind: str = "password") -> None:
 
 def main() -> int:
     print("스마트팜 관리자 비밀번호 설정 (입력 내용은 화면에 표시되지 않습니다)")
-    print(f"  형식: 숫자 4자리 PIN (예: 4827)  또는  {MIN_PASSWORD_LEN}자 이상 비밀번호")
+    print(f"  형식: 숫자 4자리 PIN (테스트용)  또는  {MIN_PASSWORD_LEN}자 이상 비밀번호 (운영용, 로그인 잠금 사용)")
     pw = getpass.getpass("새 비밀번호/PIN: ")
     kind = secret_kind(pw)
     if kind is None:
         print(f"숫자 4자리 또는 {MIN_PASSWORD_LEN}자 이상으로 입력하세요.", file=sys.stderr)
         return 1
-    if kind == "pin" and (len(set(pw)) == 1 or pw in ("1234", "4321", "0123", "9876")):
-        print("너무 쉬운 PIN 입니다(같은 숫자 반복·연속 숫자). 다른 숫자로 정하세요.", file=sys.stderr)
-        return 1
     if getpass.getpass("한 번 더 입력: ") != pw:
         print("두 입력이 일치하지 않습니다.", file=sys.stderr)
         return 1
     write_hash(ENV_PATH, hash_password(pw), kind)
-    print(f"저장 완료: {ENV_PATH} ({KEY}, 형식={'PIN 4자리' if kind == 'pin' else '비밀번호'})")
+    print(f"저장 완료: {ENV_PATH} ({KEY}, 형식={'PIN 4자리 · 테스트용(잠금 없음)' if kind == 'pin' else '비밀번호 · 운영용(잠금 사용)'})")
     print("적용: systemctl --user restart smartfarm-web")
     return 0
 

@@ -3,11 +3,11 @@
 - 비밀번호는 평문으로 저장하지 않는다. `.env` 의 ADMIN_PASSWORD_HASH 에
   scrypt 해시만 둔다(설정: python -m smartfarm.web.admin_password).
 - 세션은 서버 메모리에만 있다(웹서버 재시작 시 모두 로그아웃).
-- 비밀번호 형식: 숫자 4자리 PIN 또는 10자 이상 비밀번호.
-- 로그인 실패가 반복되면 전체 로그인을 잠그고, 잠길 때마다 잠금 시간을 2배로 늘린다
-  (15분 → 30분 → … 최대 24시간). PIN 은 경우의 수가 1만 개뿐이라 이 단계적 잠금이
-  무차별 대입을 사실상 막는 핵심 장치다. Funnel 뒤에서는 클라이언트 IP 를 신뢰할 수
-  없으므로 IP 별이 아니라 전역으로 제한한다.
+- 비밀번호 형식에 따라 보호 수준이 자동으로 정해진다.
+  * 숫자 4자리 PIN  = **테스트용**: 로그인 잠금·실패 지연 없음(편의 우선).
+  * 10자 이상 비밀번호 = **운영용**: 반복 실패 시 전체 로그인 잠금, 잠길 때마다 2배
+    (15분 → 30분 → … 최대 24시간). Funnel 뒤에서는 클라이언트 IP 를 신뢰할 수
+    없으므로 IP 별이 아니라 전역으로 제한한다.
 """
 from __future__ import annotations
 
@@ -87,6 +87,11 @@ class AdminAuth:
     def configured(self) -> bool:
         return bool(self.password_hash)
 
+    @property
+    def lockout_enabled(self) -> bool:
+        """PIN(테스트용)은 잠금·지연 없음, 비밀번호(운영용)는 잠금 사용."""
+        return self.kind != "pin"
+
     def locked_for(self) -> int:
         with self._lock:
             return max(0, int(self._locked_until - time.monotonic()))
@@ -107,6 +112,8 @@ class AdminAuth:
                 self._fails.clear()
                 self._lock_level = 0
             return token
+        if not self.lockout_enabled:
+            return None
         now = time.monotonic()
         with self._lock:
             if self._last_fail and now - self._last_fail > self.LEVEL_RESET_SEC:
