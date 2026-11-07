@@ -121,7 +121,7 @@ class PublicServerTest(unittest.TestCase):
         self.assertEqual(json.loads(body)["hours"], 24)
 
     def test_unknown_paths_404(self):
-        for path in ("/admin", "/data/smartfarm.db", "/../.env", "/static/../../.env", "/api/status", "/logs"):
+        for path in ("/admin/x", "/data/smartfarm.db", "/../.env", "/static/../../.env", "/api/status", "/logs"):
             r, _ = self.req("GET", path)
             self.assertEqual(r.status, 404, path)
 

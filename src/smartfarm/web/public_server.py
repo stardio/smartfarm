@@ -4,7 +4,9 @@
     인터넷 → Tailscale Funnel(HTTPS) → 127.0.0.1:8081 (이 서버)
 
 - 표준 라이브러리만 사용. 루프백 주소에서만 수신한다.
-- GET/HEAD 만 허용. 제어(밸브 등) 기능은 없다.
+- 공개 경로는 GET/HEAD 만 허용. 제어(밸브 등) 기능은 없다.
+- /admin: 관리자 비밀번호 로그인 후 상세 정보(설정·시스템·로그) 조회. POST 는
+  /admin/api/login, /admin/api/logout 두 개뿐이며 Origin 이 같은 사이트일 때만 받는다.
 - 데이터 출처: data/status.json(메인 서버가 기록), data/smartfarm.db(읽기 전용으로 열기).
 - 응답 필드는 허용 목록으로 새로 구성한다(핀·주소·로그·설정은 내보내지 않음).
 
@@ -15,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 import threading
 import time
@@ -22,11 +25,18 @@ from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from http.cookies import CookieError, SimpleCookie
 from urllib.parse import parse_qs, urlsplit
+
+from . import admin as admin_mod
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB = ROOT / "data" / "smartfarm.db"
 DEFAULT_STATUS = ROOT / "data" / "status.json"
+DEFAULT_CONFIG = ROOT / "config" / "config.yaml"
+DEFAULT_LOG = ROOT / "logs" / "smartfarm.log"
+DEFAULT_ENV = ROOT / ".env"
+MAX_BODY = 2048
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 SENSOR_TYPES = ("temperature", "humidity", "ph", "ec")
@@ -41,6 +51,9 @@ STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/admin": ("admin.html", "text/html; charset=utf-8"),
+    "/admin/": ("admin.html", "text/html; charset=utf-8"),
+    "/admin.js": ("admin.js", "text/javascript; charset=utf-8"),
 }
 
 SECURITY_HEADERS = {
@@ -187,7 +200,9 @@ class DataSource:
 class Handler(BaseHTTPRequestHandler):
     server_version = "smartfarm-web"
     sys_version = ""
-    data: DataSource  # make_server 에서 주입
+    data: DataSource            # make_server 에서 주입
+    auth: admin_mod.AdminAuth
+    paths: dict
 
     # 접근 로그는 남기지 않는다(공개 서버, journal 용량 절약)
     def log_message(self, format, *args):  # noqa: A002
@@ -204,9 +219,49 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
-    def _json(self, obj: dict) -> None:
+    def _send_json(self, status: int, obj: dict, extra_headers: dict | None = None) -> None:
         body = json.dumps(obj, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        self._send(HTTPStatus.OK, body, "application/json; charset=utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        for k, v in SECURITY_HEADERS.items():
+            self.send_header(k, v)
+        for k, v in (extra_headers or {}).items():
+            self.send_header(k, v)
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _json(self, obj: dict) -> None:
+        self._send_json(HTTPStatus.OK, obj)
+
+    # ── 관리자 공통 ──────────────────────────────────────────
+    def _session_token(self) -> str | None:
+        raw = self.headers.get("Cookie")
+        if not raw:
+            return None
+        try:
+            c = SimpleCookie(raw)
+        except CookieError:
+            return None
+        m = c.get(self.auth.COOKIE)
+        return m.value if m else None
+
+    def _is_admin(self) -> bool:
+        return self.auth.check(self._session_token())
+
+    def _same_origin(self) -> bool:
+        """POST 는 같은 사이트에서 온 요청만 허용(CSRF 방지)."""
+        origin = self.headers.get("Origin")
+        host = self.headers.get("Host")
+        if not origin or not host:
+            return False
+        return urlsplit(origin).netloc == host
+
+    def _cookie(self, value: str, max_age: int) -> str:
+        return (f"{self.auth.COOKIE}={value}; Path=/; Max-Age={max_age}; "
+                "HttpOnly; Secure; SameSite=Strict")
 
     def _not_found(self) -> None:
         self._send(HTTPStatus.NOT_FOUND, b"Not Found", "text/plain; charset=utf-8")
@@ -240,9 +295,62 @@ class Handler(BaseHTTPRequestHandler):
             st = self.data.status()
             return self._json({"state": st["state"], "updated_at": st["updated_at"]})
 
+        if path == "/admin/api/session":
+            return self._json({"configured": self.auth.configured,
+                               "logged_in": self._is_admin(),
+                               "locked_sec": self.auth.locked_for()})
+
+        if path == "/admin/api/overview":
+            if not self._is_admin():
+                return self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "login_required"})
+            p = self.paths
+            data = admin_mod.overview(p["root"], p["db"], p["config"], p["log"])
+            data["status"] = self.data.status()
+            return self._json(data)
+
         return self._not_found()
 
     do_HEAD = do_GET  # noqa: N815
+
+    def do_POST(self) -> None:  # noqa: N802
+        path = urlsplit(self.path).path
+        if path not in ("/admin/api/login", "/admin/api/logout"):
+            return self._method_not_allowed()
+        if not self._same_origin():
+            return self._send_json(HTTPStatus.FORBIDDEN, {"error": "bad_origin"})
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length < 0 or length > MAX_BODY:
+            return self._send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "too_large"})
+        raw = self.rfile.read(length) if length else b""
+
+        if path == "/admin/api/logout":
+            self.auth.logout(self._session_token())
+            return self._send_json(HTTPStatus.OK, {"ok": True},
+                                   {"Set-Cookie": self._cookie("", 0)})
+
+        if not self.auth.configured:
+            return self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "not_configured"})
+        locked = self.auth.locked_for()
+        if locked:
+            return self._send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "locked", "locked_sec": locked})
+        try:
+            password = json.loads(raw or b"{}").get("password", "")
+        except (ValueError, AttributeError):
+            password = ""
+        if not isinstance(password, str) or not password:
+            return self._send_json(HTTPStatus.BAD_REQUEST, {"error": "password_required"})
+
+        token = self.auth.login(password)
+        if not token:
+            locked = self.auth.locked_for()
+            if locked:
+                return self._send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "locked", "locked_sec": locked})
+            return self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "wrong_password"})
+        return self._send_json(HTTPStatus.OK, {"ok": True},
+                               {"Set-Cookie": self._cookie(token, self.auth.ABSOLUTE_SEC)})
 
     def _method_not_allowed(self) -> None:
         self.send_response(HTTPStatus.METHOD_NOT_ALLOWED)
@@ -250,11 +358,17 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    do_POST = do_PUT = do_DELETE = do_PATCH = do_OPTIONS = _method_not_allowed  # noqa: N815
+    do_PUT = do_DELETE = do_PATCH = do_OPTIONS = _method_not_allowed  # noqa: N815
 
 
-def make_server(host: str, port: int, db_path: Path, status_path: Path) -> ThreadingHTTPServer:
-    handler = type("BoundHandler", (Handler,), {"data": DataSource(db_path, status_path)})
+def make_server(host: str, port: int, db_path: Path, status_path: Path,
+                admin_hash: str | None = None, config_path: Path = DEFAULT_CONFIG,
+                log_path: Path = DEFAULT_LOG) -> ThreadingHTTPServer:
+    handler = type("BoundHandler", (Handler,), {
+        "data": DataSource(db_path, status_path),
+        "auth": admin_mod.AdminAuth(admin_hash),
+        "paths": {"root": ROOT, "db": Path(db_path), "config": Path(config_path), "log": Path(log_path)},
+    })
     httpd = ThreadingHTTPServer((host, port), handler)
     httpd.daemon_threads = True
     return httpd
@@ -268,7 +382,17 @@ def main() -> None:
     ap.add_argument("--status", type=Path, default=DEFAULT_STATUS)
     args = ap.parse_args()
 
-    httpd = make_server(args.host, args.port, args.db, args.status)
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(DEFAULT_ENV)
+    except ImportError:
+        pass
+    admin_hash = os.environ.get("ADMIN_PASSWORD_HASH") or None
+    if not admin_hash:
+        print("ADMIN_PASSWORD_HASH 미설정 → 관리자 로그인 비활성 "
+              "(python -m smartfarm.web.admin_password 로 설정)", flush=True)
+
+    httpd = make_server(args.host, args.port, args.db, args.status, admin_hash=admin_hash)
     print(f"smartfarm-web listening on http://{args.host}:{args.port}", flush=True)
     try:
         httpd.serve_forever()

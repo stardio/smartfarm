@@ -21,6 +21,8 @@
 - [x] Tailscale 설치·합류, 부팅 자동 시작 (2026-11-07)
 - [x] 공개(보기 전용) 웹 대시보드 `smartfarm-web` 서비스 (127.0.0.1:8081) + Tailscale Funnel 공개 (2026-11-07)
       → https://smartfarm-pi.tail084a13.ts.net/  상세: [PUBLIC_WEB.md](PUBLIC_WEB.md)
+- [x] 관리자 페이지 `/admin` (비밀번호 로그인, 보기 전용 상세 정보) (2026-11-07)
+      비밀번호 설정: `PYTHONPATH=src .venv/bin/python -m smartfarm.web.admin_password`
 
 ## 접속 방법
 - 공개 대시보드(누구나, 보기 전용): https://smartfarm-pi.tail084a13.ts.net/

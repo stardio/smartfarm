@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex, nofollow">
+<title>스마트팜 관리자</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-inner">
+    <div>
+      <h1>스마트팜 관리자</h1>
+      <p class="sub"><a href="/">← 공개 현황 페이지</a></p>
+    </div>
+    <button type="button" class="btn ghost" id="logout" hidden>로그아웃</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- 로그인 -->
+  <section id="login-view" hidden>
+    <form class="login card" id="login-form" autocomplete="on">
+      <h2>관리자 로그인</h2>
+      <input type="text" name="username" value="admin" autocomplete="username" hidden>
+      <label for="password">비밀번호</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button type="submit" class="btn" id="login-btn">로그인</button>
+      <p class="msg" id="login-msg" role="alert"></p>
+    </form>
+  </section>
+
+  <section id="setup-view" hidden>
+    <div class="card login">
+      <h2>관리자 비밀번호가 설정되지 않았습니다</h2>
+      <p class="muted">라즈베리 파이에서 아래 명령으로 비밀번호를 설정한 뒤 웹서버를 재시작하세요.</p>
+      <pre class="code">cd ~/smartfarm
+PYTHONPATH=src .venv/bin/python -m smartfarm.web.admin_password
+systemctl --user restart smartfarm-web</pre>
+    </div>
+  </section>
+
+  <!-- 관리자 화면 -->
+  <div id="admin-view" hidden>
+    <section>
+      <div class="section-head">
+        <h2>서비스 · 시스템</h2>
+        <span class="muted" id="refreshed">—</span>
+      </div>
+      <div class="grid" id="sys"></div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>센서 설정</h2></div>
+      <div class="table-wrap"><table id="sensor-table"></table></div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>밸브 설정</h2></div>
+      <div class="table-wrap"><table id="valve-table"></table></div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>자동제어 기준 · 알림</h2></div>
+      <div class="table-wrap"><table id="rule-table"></table></div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>최근 로그</h2>
+        <span class="muted">민감값은 가려서 표시</span>
+      </div>
+      <pre class="code log" id="logs"></pre>
+    </section>
+  </div>
+</main>
+
+<footer class="wrap foot muted">관리자 화면은 30초마다 자동 갱신 · 2시간 동안 사용하지 않으면 자동 로그아웃</footer>
+<script src="/admin.js"></script>
+</body>
+</html>
