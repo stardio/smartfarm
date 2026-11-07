@@ -77,7 +77,11 @@ class Bus:
             self.t = RtuTransport(p["port"], p["baudrate"], p["parity"], p["stopbits"], p["timeout"])
             self.where = f"{p['port']} {p['baudrate']}bps {p['parity']}"
         else:
-            self.t = SimTransport(sims.setdefault(self.id, {}), p["timeout"])
+            if self.id not in sims:
+                # 실제 현장처럼 미리 연결된 가상 장비: 국번 1·2 = 16채널 릴레이 보드, 3·4 = 온습도 센서
+                sims[self.id] = {1: SimDevice("relay", 16), 2: SimDevice("relay", 16),
+                                 3: SimDevice("sensor"), 4: SimDevice("sensor")}
+            self.t = SimTransport(sims[self.id], p["timeout"])
             self.where = "시뮬레이터"
 
 

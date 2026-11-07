@@ -234,8 +234,8 @@ class ManagerTest(ManagerBase):
         self.assertTrue(self.sim().coils[6])
         self.poll(1, step=2.5)
         self.assertFalse(self.sim().coils[6])
-        res = self.iom.run_job({"action": "io_scan", "bus_id": self.bus, "start": 1, "end": 4})
-        self.assertEqual([f["unit"] for f in res["found"]], [1])
+        res = self.iom.run_job({"action": "io_scan", "bus_id": self.bus, "start": 1, "end": 6})
+        self.assertEqual([f["unit"] for f in res["found"]], [1, 2, 3, 4])     # 시뮬레이터 기본 가상 장비
         with self.assertRaises(ValueError):
             self.iom.run_job({"action": "io_pulse", "device_id": self.relay, "idx": 6, "seconds": 60})
 
